@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #efe0bd;
+  --paper: #f9edd1;
+  --ink: #493625;
+  --muted: #806b55;
+  --line: #ddc79c;
+  --yellow: #eebc3f;
+  --yellow-soft: #f8dc8a;
+  --ochre: #9a641e;
+  --brown-light: #cfad78;
+  --brown: #805735;
+  --brown-dark: #5a3a24;
+  --sage: #a7a77a;
+  --sage-soft: #ded9b6;
+  --sage-dark: #62684e;
+}
+
+@theme inline {
+  --color-background: var(--cream);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-geist-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--cream);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(255, 205, 78, 0.25), transparent 25rem),
+    radial-gradient(circle at 84% 35%, rgba(156, 102, 53, 0.12), transparent 30rem),
+    var(--cream);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.memory-illustration {
+  background: linear-gradient(145deg, rgba(255, 234, 176, 0.34), transparent 50%), #e2c985;
+}
+
+::selection {
+  background: var(--yellow-soft);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
