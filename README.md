@@ -7,7 +7,7 @@ fotografías y emociones sin convertir la vida en una lista de productividad.
 
 ## Etapa actual
 
-Las etapas 1 y 2 establecen la base visual y de datos:
+Las etapas 1 y 2 establecieron la base visual y de datos:
 
 - Next.js con App Router y TypeScript.
 - Tailwind CSS para los estilos.
@@ -18,7 +18,17 @@ Las etapas 1 y 2 establecen la base visual y de datos:
 - Modelo documental para libros, páginas, texto, dibujos y stickers posicionables.
 - Migración SQL inicial e índices de MongoDB reproducibles.
 
-La interfaz aún usa datos de demostración. Las conexiones reales, autenticación y guardado desde la UI comienzan en la etapa 3. Consulta la [arquitectura de datos](./docs/architecture/database.md).
+La primera entrega vertical de la etapa 3 ya conecta esas piezas:
+
+- Registro, inicio y cierre de sesión con Supabase Auth.
+- Perfiles de usuario sincronizados con PostgreSQL.
+- Rutas privadas y políticas RLS para aislar los datos de cada persona.
+- Libro diario 3D con dos páginas editables y stickers posicionables.
+- Autoguardado en MongoDB con historial de revisiones.
+- Registro relacional de cada entrada y eventos de sincronización en PostgreSQL.
+
+Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
+[guía de la etapa 3](./docs/stage-3.md).
 
 ## Ejecutar localmente
 
@@ -28,6 +38,9 @@ pnpm dev
 ```
 
 Después abre [http://localhost:3000](http://localhost:3000).
+
+Para probar el registro y el diario necesitas completar primero las variables de
+`.env.local` descritas en [`.env.example`](./.env.example).
 
 ## Comandos útiles
 
