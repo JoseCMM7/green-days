@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import {
-  initialAuthState,
   login,
   signUp,
   type AuthState,
@@ -12,6 +11,8 @@ import {
 type AuthFormProps = {
   mode: "login" | "sign-up";
 };
+
+const initialAuthState: AuthState = { status: "idle" };
 
 function FieldError({ state, name }: { state: AuthState; name: string }) {
   const message = state.fieldErrors?.[name]?.[0];

@@ -11,7 +11,7 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Green Days — Guarda la vida mientras sucede",
   description:
-    "Un refugio digital privado para guardar los pequeños momentos de cada día.",
+    "Un diario digital privado para guardar los pequeños momentos de cada día.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

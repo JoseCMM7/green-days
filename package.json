@@ -11,7 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "mongo:indexes": "tsx scripts/mongodb/ensure-indexes.ts",
-    "test:models": "tsx --test tests/mongodb-schemas.test.ts"
+    "test:models": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

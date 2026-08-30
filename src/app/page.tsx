@@ -1,5 +1,10 @@
 import { DailyEntryCard } from "@/components/daily-entry-card";
 import { MonthCalendar } from "@/components/month-calendar";
+import { dateInTimeZone, formatEntryDate } from "@/features/journal/date";
+import { requireUser } from "@/lib/auth/current-user";
+import { ensureProfile } from "@/lib/auth/profiles";
+
+export const dynamic = "force-dynamic";
 
 function SparkleIcon() {
   return (
@@ -16,17 +21,25 @@ function SparkleIcon() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const user = await requireUser();
+  const profile = await ensureProfile({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+  });
+  const today = dateInTimeZone(profile.timeZone);
+
   return (
       <main className="pb-28 pt-9 lg:pb-14 lg:pt-14">
         <div className="mx-auto grid w-full max-w-[92rem] gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_21rem] lg:px-12 xl:gap-14">
           <section className="min-w-0">
             <div className="mb-8 max-w-2xl lg:mb-10">
               <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--brown)]">
-                Viernes, 28 de agosto
+                {formatEntryDate(today)}
               </p>
               <h1 className="font-display text-4xl leading-[1.05] font-semibold tracking-[-0.045em] sm:text-5xl lg:text-6xl">
-                Qué gusto tenerte aquí.
+                Qué gusto tenerte aquí, {profile.displayName.split(" ")[0]}.
               </h1>
               <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)] sm:text-lg">
                 No hace falta que hoy haya sido perfecto. Solo guarda aquello que
@@ -94,17 +107,14 @@ export default function Home() {
                 <SparkleIcon />
               </div>
               <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#ecd7b4]">
-                Una pausa amable
+                Tu espacio privado
               </p>
               <h2 className="font-display mt-2 text-2xl font-semibold tracking-[-0.025em]">
-                Respira. Este momento también cuenta.
+                Lo que escribas aquí es solamente tuyo.
               </h2>
-              <button
-                type="button"
-                className="mt-6 rounded-full bg-[var(--yellow)] px-5 py-2.5 text-sm font-bold text-[var(--brown-dark)] transition hover:bg-[#f7d26f]"
-              >
-                Entrar al refugio
-              </button>
+              <p className="mt-4 text-sm leading-6 text-[#ecd7b4]">
+                La sesión se verifica antes de abrir o guardar cada una de tus páginas.
+              </p>
             </section>
           </aside>
         </div>

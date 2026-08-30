@@ -27,8 +27,6 @@ export type AuthState = {
   fieldErrors?: Record<string, string[]>;
 };
 
-export const initialAuthState: AuthState = { status: "idle" };
-
 export async function login(
   _previousState: AuthState,
   formData: FormData,
