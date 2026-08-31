@@ -43,11 +43,18 @@ La etapa 5 de preparación local también está disponible, sin despliegue:
 - Accesibilidad por teclado y recuperación global de errores.
 - Pruebas adicionales para operaciones sensibles.
 
+La etapa 6 comenzó con el editor creativo avanzado:
+
+- Libros de hasta 40 páginas organizadas por pliegos.
+- Dibujo libre persistente con color, grosor y deshacer.
+- Coordenadas adaptables para ratón, lápiz y pantalla táctil.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
 [guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
 etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
 La preparación previa al lanzamiento está documentada en la
 [guía de la etapa 5](./docs/stage-5.md).
+El progreso del editor creativo está en la [guía de la etapa 6](./docs/stage-6.md).
 
 ## Ejecutar localmente
 

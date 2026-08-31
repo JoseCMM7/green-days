@@ -44,5 +44,5 @@ del libro con cuatro formas de volver a ellas. No se realizó ningún despliegue
 - La migración `stage4_living_album_rules` añade sólo el JSON opcional de reglas
   automáticas a `albums`, por lo que puede evolucionar después.
 
-Fotografías, audio y dibujo siguen siendo ampliaciones futuras del editor, no
-bloquean los cuatro módulos que definen esta etapa.
+Fotografías y audio siguen siendo ampliaciones del editor; el dibujo libre ya
+comenzó en la etapa 6. Ninguna bloquea los cuatro módulos de esta etapa.
