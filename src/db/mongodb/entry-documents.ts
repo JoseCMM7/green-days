@@ -1,18 +1,43 @@
 import "server-only";
 
+import {
+  MongoNetworkError,
+  MongoServerSelectionError,
+  MongoTopologyClosedError,
+} from "mongodb";
+import { resetMongoConnection } from "./client";
 import { getMongoCollections } from "./collections";
 import { entryDocumentSchema, type EntryDocument } from "./schemas";
 
+function isTransientConnectionError(error: unknown) {
+  return (
+    error instanceof MongoTopologyClosedError
+    || error instanceof MongoServerSelectionError
+    || error instanceof MongoNetworkError
+  );
+}
+
 export async function findEntryDocument(entryId: string, userId: string) {
-  const { entryDocuments } = getMongoCollections();
-  const document = await entryDocuments.findOne({ _id: entryId, userId });
+  async function find() {
+    const { entryDocuments } = await getMongoCollections();
+    return entryDocuments.findOne({ _id: entryId, userId });
+  }
+
+  let document;
+  try {
+    document = await find();
+  } catch (error) {
+    if (!isTransientConnectionError(error)) throw error;
+    await resetMongoConnection();
+    document = await find();
+  }
 
   return document ? entryDocumentSchema.parse(document) : null;
 }
 
 export async function insertEntryDocument(input: EntryDocument) {
   const document = entryDocumentSchema.parse(input);
-  const { entryDocuments } = getMongoCollections();
+  const { entryDocuments } = await getMongoCollections();
 
   await entryDocuments.insertOne(document);
   return document;
@@ -26,7 +51,7 @@ export async function replaceEntryDocument(input: EntryDocument, expectedRevisio
   }
 
   const { _id, ...replacement } = document;
-  const { entryDocuments, entryVersions } = getMongoCollections();
+  const { entryDocuments, entryVersions } = await getMongoCollections();
 
   const current = await entryDocuments.findOne({
     _id,

@@ -9,8 +9,8 @@ import type {
   EntryVersion,
 } from "./schemas";
 
-export function getMongoCollections() {
-  const database = getMongoDatabase();
+export async function getMongoCollections() {
+  const database = await getMongoDatabase();
 
   return {
     entryDocuments: database.collection<EntryDocument>("entry_documents"),
