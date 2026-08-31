@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { TopNavigation } from "@/components/top-navigation";
 import "./globals.css";
@@ -12,6 +12,12 @@ export const metadata: Metadata = {
   title: "Green Days — Guarda la vida mientras sucede",
   description:
     "Un diario digital privado para guardar los pequeños momentos de cada día.",
+  robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light",
+  themeColor: "#efe0bd",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -22,9 +28,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        <a href="#main-content" className="skip-link">Saltar al contenido</a>
         <div className="min-h-screen bg-[var(--cream)] text-[var(--ink)]">
           <TopNavigation />
-          {children}
+          <div id="main-content" tabIndex={-1}>{children}</div>
         </div>
       </body>
     </html>
