@@ -46,7 +46,7 @@ La animación 3D se ejecuta en React/CSS. La base guarda los parámetros persist
 - `journal_entries`: un registro por persona y fecha, con el UUID compartido con MongoDB.
 - `emotions` y `entry_emotions`: catálogo emocional y relación muchos-a-muchos, incluida la intensidad.
 - `tags` y `entry_tags`: etiquetas personales reutilizables.
-- `media_assets` y `entry_media`: metadatos y relaciones de fotos/audio; el archivo vive en Storage.
+- `media_assets` y `entry_media`: metadatos y relaciones de fotos/audio; el archivo vive en el bucket privado `journal-media` de Storage.
 - `time_capsules` y `capsule_media`: fecha de apertura, estado y medios de una cápsula.
 - `albums` y `album_entries`: colecciones ordenadas de entradas; `auto_rule` puede incorporar recuerdos por fecha o emoción.
 - `user_preferences`: tema del libro, recordatorios, movimiento reducido y recuerdos que pueden reaparecer.
@@ -114,5 +114,9 @@ Las migraciones ya aplicadas no se editan: cada cambio crea una migración nueva
 6. Duplicar `.env.example` como `.env.local` y reemplazar solo allí los valores de ejemplo.
 7. Ejecutar `pnpm db:migrate` para crear las tablas.
 8. Ejecutar `pnpm mongo:indexes` para crear los índices de las colecciones.
+
+La migración de la etapa 6 crea automáticamente el bucket privado de medios y
+sus políticas. No se debe cambiar a público: la aplicación descarga cada archivo
+a través de una ruta autenticada y verifica su propietario en PostgreSQL.
 
 `.env.local` está ignorado por Git. Las credenciales no deben copiarse al chat ni subirse al repositorio.

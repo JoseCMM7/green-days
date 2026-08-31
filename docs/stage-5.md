@@ -48,7 +48,7 @@ en el diario antes de publicar.
 - Publicación en Vercel, dominio y variables de producción.
 - Monitoreo externo: la instrumentación local está lista para conectar un
   proveedor cuando se elija uno.
-- Fotografías y audio como ampliaciones futuras del editor.
+- Ajustes de producto que se decidan después de probar el editor creativo.
 
 No se debe desplegar hasta rotar cualquier contraseña que haya sido compartida
 durante el desarrollo y completar una última revisión de las variables.
