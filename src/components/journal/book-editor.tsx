@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageElement } from "@/db/mongodb/schemas";
 import { moodCatalog, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
+import {
+  addDrawingPath,
+  createBookSpread,
+  MAX_JOURNAL_PAGES,
+  normalizedDrawingPoint,
+  pagesInSpread,
+  pointsToSvgPath,
+  removeLastBookSpread,
+  spreadCount,
+  undoLastDrawingPath,
+} from "@/features/journal/book-pages";
 import type { JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
 
@@ -16,6 +27,9 @@ type BookEditorProps = {
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "conflict";
 type StickerElement = Extract<PageElement, { type: "sticker" }>;
+type DrawingElement = Extract<PageElement, { type: "drawing" }>;
+type DrawingPoint = DrawingElement["content"]["paths"][number][number];
+type EditorTool = "write" | "draw";
 
 const stickerPalette = [
   { id: "pressed-flower", glyph: "🌼", label: "Flor" },
@@ -69,7 +83,12 @@ export function BookEditor({
 }: BookEditorProps) {
   const [book, setBook] = useState(initialBook);
   const [isOpen, setIsOpen] = useState(false);
+  const [spreadIndex, setSpreadIndex] = useState(0);
   const [activePageId, setActivePageId] = useState(initialBook.pages[0].id);
+  const [editorTool, setEditorTool] = useState<EditorTool>("write");
+  const [drawingColor, setDrawingColor] = useState("#805735");
+  const [drawingWidth, setDrawingWidth] = useState(8);
+  const [drawingPreview, setDrawingPreview] = useState<DrawingPoint[]>([]);
   const [selectedSticker, setSelectedSticker] = useState<{
     pageId: string;
     elementId: string;
@@ -84,6 +103,8 @@ export function BookEditor({
   const primaryMoodRef = useRef<MoodSlug | null>(primaryMoodSlug);
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
+  const drawingPathRef = useRef<DrawingPoint[]>([]);
+  const drawingPageRef = useRef<string | null>(null);
   const saveFunctionRef = useRef<() => Promise<void>>(async () => undefined);
 
   const changeBook = useCallback((transform: (draft: JournalBook) => void) => {
@@ -155,6 +176,96 @@ export function BookEditor({
     setPrimaryMoodSlug(nextMood);
     dirtyRef.current = true;
     setStatus("unsaved");
+  }
+
+  function goToSpread(nextIndex: number) {
+    const safeIndex = clamp(nextIndex, 0, spreadCount(bookRef.current) - 1);
+    const [firstPage] = pagesInSpread(bookRef.current, safeIndex);
+    setSpreadIndex(safeIndex);
+    if (firstPage) setActivePageId(firstPage.id);
+    setSelectedSticker(null);
+    setDrawingPreview([]);
+  }
+
+  function addSpread() {
+    if (bookRef.current.pages.length >= MAX_JOURNAL_PAGES) return;
+    const newPages = createBookSpread(bookRef.current);
+    const nextSpreadIndex = spreadCount(bookRef.current);
+    changeBook((draft) => { draft.pages.push(...newPages); });
+    setSpreadIndex(nextSpreadIndex);
+    setActivePageId(newPages[0].id);
+    setSelectedSticker(null);
+  }
+
+  function removeLastSpread() {
+    if (bookRef.current.pages.length <= 2 || !window.confirm("¿Quitar el último pliego? También se borrará lo escrito y dibujado en esas dos páginas.")) return;
+    changeBook((draft) => { removeLastBookSpread(draft); });
+    const nextIndex = Math.max(0, spreadCount(bookRef.current) - 2);
+    const [firstPage] = pagesInSpread(bookRef.current, nextIndex);
+    setSpreadIndex(nextIndex);
+    if (firstPage) setActivePageId(firstPage.id);
+    setSelectedSticker(null);
+  }
+
+  function drawingPoint(event: React.PointerEvent<HTMLElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return normalizedDrawingPoint(
+      event.clientX - bounds.left,
+      event.clientY - bounds.top,
+      bounds.width,
+      bounds.height,
+      event.pressure,
+    );
+  }
+
+  function beginDrawing(event: React.PointerEvent<HTMLDivElement>, pageId: string) {
+    if (editorTool !== "draw") return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = drawingPoint(event);
+    drawingPageRef.current = pageId;
+    drawingPathRef.current = [point];
+    setDrawingPreview([point]);
+    setActivePageId(pageId);
+    setSelectedSticker(null);
+  }
+
+  function continueDrawing(event: React.PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId) || drawingPageRef.current === null) return;
+    const point = drawingPoint(event);
+    const previous = drawingPathRef.current.at(-1);
+    if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.0025) return;
+    drawingPathRef.current = [...drawingPathRef.current, point];
+    setDrawingPreview(drawingPathRef.current);
+  }
+
+  function finishDrawing(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const pageId = drawingPageRef.current;
+    const path = drawingPathRef.current;
+    drawingPageRef.current = null;
+    drawingPathRef.current = [];
+    setDrawingPreview([]);
+    if (!pageId || path.length < 2) return;
+    changeBook((draft) => {
+      const page = draft.pages.find((candidate) => candidate.id === pageId);
+      if (page) addDrawingPath(page, path, drawingColor, drawingWidth);
+    });
+  }
+
+  function undoDrawing() {
+    changeBook((draft) => {
+      const page = draft.pages.find((candidate) => candidate.id === activePageId);
+      if (page) undoLastDrawingPath(page);
+    });
+  }
+
+  function clearDrawings() {
+    if (!window.confirm("¿Borrar todos los dibujos de esta página?")) return;
+    changeBook((draft) => {
+      const page = draft.pages.find((candidate) => candidate.id === activePageId);
+      if (page) page.elements = page.elements.filter((element) => element.type !== "drawing");
+    });
   }
 
   function updateText(pageId: string, elementId: string, text: string) {
@@ -258,6 +369,8 @@ export function BookEditor({
         .find((page) => page.id === selectedSticker.pageId)
         ?.elements.find((element) => element.id === selectedSticker.elementId)
     : null;
+  const visiblePages = pagesInSpread(book, spreadIndex);
+  const totalSpreads = spreadCount(book);
 
   return (
     <div className="book-editor" data-entry-id={entryId}>
@@ -325,6 +438,23 @@ export function BookEditor({
             </div>
           </div>
         </div>
+        <div className="mb-5 flex flex-col gap-4 border-b border-[var(--line)] pb-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">Herramienta creativa</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Herramienta activa">
+              <button type="button" disabled={!isOpen} onClick={() => setEditorTool("write")} aria-pressed={editorTool === "write"} className={`tool-pill ${editorTool === "write" ? "bg-[var(--yellow-soft)]" : ""}`}>✍️ Escribir y mover</button>
+              <button type="button" disabled={!isOpen} onClick={() => { setEditorTool("draw"); setSelectedSticker(null); }} aria-pressed={editorTool === "draw"} className={`tool-pill ${editorTool === "draw" ? "bg-[var(--yellow-soft)]" : ""}`}>🖍️ Dibujar</button>
+            </div>
+          </div>
+          {editorTool === "draw" && (
+            <div className="flex flex-wrap items-end gap-3 rounded-2xl bg-[#fff8e8] p-3">
+              <label className="grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Color<input type="color" value={drawingColor} onChange={(event) => setDrawingColor(event.target.value)} className="h-9 w-16 rounded-lg border border-[var(--line)] p-1" /></label>
+              <label className="grid gap-1 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Trazo<select value={drawingWidth} onChange={(event) => setDrawingWidth(Number(event.target.value))} className="h-9 rounded-lg border border-[var(--line)] bg-white px-2 text-xs font-normal normal-case"><option value={4}>Fino</option><option value={8}>Medio</option><option value={16}>Grueso</option><option value={28}>Marcador</option></select></label>
+              <button type="button" onClick={undoDrawing} className="tool-pill">Deshacer trazo</button>
+              <button type="button" onClick={clearDrawings} className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]">Borrar dibujos</button>
+            </div>
+          )}
+        </div>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">
@@ -348,22 +478,26 @@ export function BookEditor({
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
-              Página
+              Pliego
             </span>
-            {book.pages.map((page) => (
+            {Array.from({ length: totalSpreads }, (_, index) => (
               <button
-                key={page.id}
+                key={index}
                 type="button"
-                onClick={() => setActivePageId(page.id)}
+                onClick={() => goToSpread(index)}
                 className={`rounded-full px-4 py-2 text-xs font-bold transition ${
-                  activePageId === page.id
+                  spreadIndex === index
                     ? "bg-[var(--yellow)] text-[var(--brown-dark)]"
                     : "border border-[var(--brown-light)] bg-[#fff6df] text-[var(--brown)]"
                 }`}
               >
-                {page.side === "left" ? "Izquierda" : "Derecha"}
+                {index * 2 + 1}–{index * 2 + 2}
               </button>
             ))}
+            <button type="button" onClick={() => goToSpread(spreadIndex - 1)} disabled={spreadIndex === 0} className="tool-pill disabled:opacity-40" aria-label="Pliego anterior">←</button>
+            <button type="button" onClick={() => goToSpread(spreadIndex + 1)} disabled={spreadIndex >= totalSpreads - 1} className="tool-pill disabled:opacity-40" aria-label="Pliego siguiente">→</button>
+            <button type="button" onClick={addSpread} disabled={!isOpen || book.pages.length >= MAX_JOURNAL_PAGES} className="tool-pill disabled:opacity-40">+ Dos páginas</button>
+            {book.pages.length > 2 && <button type="button" onClick={removeLastSpread} className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]">Quitar últimas</button>}
 
             {selectedStickerData?.type === "sticker" && selectedSticker && (
               <>
@@ -425,7 +559,7 @@ export function BookEditor({
       <div className="book-stage">
         <div className={`book-object ${isOpen ? "is-open" : ""}`}>
           <div className="book-pages" aria-hidden={!isOpen}>
-            {book.pages.slice(0, 2).map((page) => (
+            {visiblePages.map((page) => (
               <section
                 key={page.id}
                 data-book-page
@@ -444,6 +578,23 @@ export function BookEditor({
                     zIndex: element.frame.zIndex,
                     transform: `rotate(${element.frame.rotation}deg)`,
                   };
+
+                  if (element.type === "drawing") {
+                    return (
+                      <svg
+                        key={element.id}
+                        viewBox={`0 0 ${element.frame.width} ${element.frame.height}`}
+                        preserveAspectRatio="none"
+                        className="pointer-events-none absolute overflow-visible"
+                        style={frameStyle}
+                        aria-hidden="true"
+                      >
+                        {element.content.paths.map((path, pathIndex) => (
+                          <path key={pathIndex} d={pointsToSvgPath(path, element.frame.width, element.frame.height)} fill="none" stroke={element.content.color} strokeWidth={element.content.strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+                        ))}
+                      </svg>
+                    );
+                  }
 
                   if (element.type === "text") {
                     return (
@@ -485,6 +636,23 @@ export function BookEditor({
 
                   return null;
                 })}
+                {editorTool === "draw" && isOpen && (
+                  <div
+                    className="absolute inset-0 z-50 cursor-crosshair touch-none"
+                    role="application"
+                    aria-label={`Lienzo de dibujo de la página ${page.pageNumber}`}
+                    onPointerDown={(event) => beginDrawing(event, page.id)}
+                    onPointerMove={continueDrawing}
+                    onPointerUp={finishDrawing}
+                    onPointerCancel={finishDrawing}
+                  >
+                    {page.id === activePageId && drawingPreview.length > 1 && (
+                      <svg viewBox="0 0 1000 1400" preserveAspectRatio="none" className="size-full" aria-hidden="true">
+                        <path d={pointsToSvgPath(drawingPreview)} fill="none" stroke={drawingColor} strokeWidth={drawingWidth} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                )}
               </section>
             ))}
           </div>
@@ -512,7 +680,7 @@ export function BookEditor({
 
       {isOpen && (
         <p className="mt-5 text-center text-sm leading-6 text-[var(--muted)]">
-          Escribe directamente sobre las páginas. Selecciona un sticker y arrástralo hasta el lugar que quieras.
+          Escribe, dibuja o coloca stickers. Añade pliegos cuando necesites más espacio; todo conserva su posición al guardarse.
         </p>
       )}
     </div>
