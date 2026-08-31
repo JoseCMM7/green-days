@@ -2,7 +2,7 @@
 
 Esta etapa fortalece Green Days para seguir desarrollándolo y probarlo como un
 producto real. El despliegue fue excluido intencionalmente: todavía habrá cambios
-en el diario y en los módulos de la etapa 4.
+en el diario antes de publicar.
 
 ## Implementado
 
@@ -48,9 +48,7 @@ en el diario y en los módulos de la etapa 4.
 - Publicación en Vercel, dominio y variables de producción.
 - Monitoreo externo: la instrumentación local está lista para conectar un
   proveedor cuando se elija uno.
-- Fotografías, audio y dibujo del editor.
-- Cápsulas funcionales, álbumes vivos y personalización profunda de la etapa 4.
+- Fotografías, audio y dibujo como ampliaciones futuras del editor.
 
 No se debe desplegar hasta rotar cualquier contraseña que haya sido compartida
 durante el desarrollo y completar una última revisión de las variables.
-

@@ -38,7 +38,7 @@ Un sticker guarda una geometría semejante a esta:
 
 La interfaz escala esas coordenadas proporcionalmente. Por eso la composición se mantiene al abrirla en un teléfono, una laptop o una pantalla grande. `zIndex` decide qué objeto se ve encima; `rotation` conserva el giro. El modelo acepta texto manuscrito, stickers, fotografías, audio y dibujos.
 
-La animación 3D se ejecutará en React/CSS o con una librería gráfica en una etapa visual. La base guarda los parámetros persistentes de esa experiencia —material, colores, perspectiva, duración y estilo de apertura—, no los fotogramas de la animación.
+La animación 3D se ejecuta en React/CSS. La base guarda los parámetros persistentes de esa experiencia —material, colores, perspectiva, duración y estilo de apertura—, no los fotogramas de la animación.
 
 ## Modelo relacional
 
@@ -48,7 +48,7 @@ La animación 3D se ejecutará en React/CSS o con una librería gráfica en una 
 - `tags` y `entry_tags`: etiquetas personales reutilizables.
 - `media_assets` y `entry_media`: metadatos y relaciones de fotos/audio; el archivo vive en Storage.
 - `time_capsules` y `capsule_media`: fecha de apertura, estado y medios de una cápsula.
-- `albums` y `album_entries`: colecciones ordenadas de entradas.
+- `albums` y `album_entries`: colecciones ordenadas de entradas; `auto_rule` puede incorporar recuerdos por fecha o emoción.
 - `user_preferences`: tema del libro, recordatorios, movimiento reducido y recuerdos que pueden reaparecer.
 - `outbox_events`: trabajo pendiente para mantener PostgreSQL y MongoDB sincronizados sin fingir una transacción distribuida.
 
@@ -72,15 +72,15 @@ Antes de reemplazar un libro se copia su estado actual a `entry_versions`. El í
 
 ## Flujo de sincronización
 
-PostgreSQL y MongoDB no comparten una transacción ACID. Green Days usará el patrón Outbox:
+PostgreSQL y MongoDB no comparten una transacción ACID. Green Days usa el patrón Outbox:
 
 1. Una operación escribe en PostgreSQL el cambio relacional y un `outbox_event` en la misma transacción.
-2. Un proceso de sincronización toma el evento y valida el documento con Zod.
+2. El servicio intenta procesar inmediatamente el evento y valida el documento con Zod.
 3. Escribe el contenido en MongoDB usando el UUID compartido y la revisión esperada.
 4. Marca la entrada como `ready` y el evento como `processed`.
-5. Si algo falla, conserva el evento, registra el error y reintenta; nunca aparenta que ambas escrituras fueron atómicas.
+5. Si algo falla, registra el evento como fallido y retira la referencia incompleta cuando corresponde; nunca aparenta que ambas escrituras fueron atómicas.
 
-Los endpoints y el worker se implementarán junto con autenticación en la etapa 3, porque allí ya existirán usuarios reales y conexiones a ambos servicios.
+Antes de producción se podrá añadir un worker que reprocese automáticamente eventos pendientes; el registro auditable ya está preparado para ello.
 
 ## Por qué Drizzle
 

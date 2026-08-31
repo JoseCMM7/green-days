@@ -1,49 +1,48 @@
 # Etapa 4: recuerdos conectados
 
-La etapa 4 transforma entradas aisladas en una historia que puede recorrerse. Se
-construirá en cuatro bloques:
+La etapa 4 está completa en desarrollo local. Green Days ya conecta las entradas
+del libro con cuatro formas de volver a ellas. No se realizó ningún despliegue.
 
-1. **Calendario emocional:** entradas por mes, emoción principal, colores y
-   navegación entre meses.
-2. **Cápsulas del tiempo:** recuerdos sellados hasta una fecha elegida.
-3. **Álbumes vivos:** colecciones que reúnen entradas y archivos por tema,
-   persona, lugar o periodo.
-4. **Personalización profunda:** portadas, papel, tipografía y decoración del
-   espacio personal.
+## 1. Calendario emocional
 
-## Primer bloque implementado
+- Vista mensual con entradas reales y emoción principal.
+- Navegación entre meses, resumen y emoción más frecuente.
+- PostgreSQL resuelve la consulta pequeña sin cargar documentos visuales.
 
-El calendario emocional ya dejó de usar datos de demostración:
+## 2. Cápsulas del tiempo
 
-- El libro permite elegir entre seis emociones principales.
-- La emoción se guarda de forma relacional en PostgreSQL mediante `emotions` y
-  `entry_emotions`.
-- Una migración de Drizzle instala el catálogo compartido de emociones.
-- `/api/calendar?month=AAAA-MM` devuelve exclusivamente los días del usuario
-  autenticado y desactiva el caché compartido.
-- `/calendar` carga el mes actual en el servidor y cambia de mes desde el cliente
-  sin recargar toda la aplicación.
-- La cuadrícula marca días con entrada, color emocional, día actual y selección.
-- El panel lateral muestra momentos reales y la emoción más frecuente del mes.
+- Se eligen título, mensaje, fecha, papel, sello y forma de apertura.
+- PostgreSQL conserva propietario, fecha y estado (`sealed` o `unlocked`).
+- MongoDB conserva el mensaje y su presentación.
+- El servidor vuelve a verificar propietario y fecha antes de romper el sello.
+- Una cápsula puede abrirse en su vista individual y eliminarse con confirmación.
 
-MongoDB conserva el diseño del libro y PostgreSQL responde el calendario. Esta
-separación evita recorrer documentos visuales grandes para obtener una vista
-mensual pequeña.
+## 3. Álbumes vivos
 
-## Próximos bloques de la etapa 4
+- Álbumes reales con descripción, color y diseño de recortes, película o libro.
+- Las entradas pueden añadirse y quitarse manualmente.
+- Una regla opcional por fecha y/o emoción incorpora nuevas entradas que
+  coincidan cada vez que el álbum se visita.
+- PostgreSQL guarda pertenencia, regla y orden; MongoDB guarda la presentación.
 
-El siguiente incremento será **Cápsulas del tiempo**. Después llegarán los
-álbumes vivos y la personalización. Cada módulo se conectará a las tablas y
-políticas RLS que ya existen, en lugar de depender de contenido ficticio.
+## 4. Personalización profunda
 
-## Etapa 5
+- Cuatro atmósferas prediseñadas y una mezcla de colores propia.
+- Fondo, papel, tinta, acento, portada, lomo y tipografía configurables.
+- Opción persistente para reducir movimiento.
+- El tema se aplica a la navegación, páginas y componentes de toda la app.
+- Los libros nuevos heredan portada, papel, tinta y tipografía del tema activo.
 
-La etapa 5 será la preparación para publicar Green Days como un producto sólido:
+## Consistencia y seguridad
 
-- accesibilidad y experiencia móvil completas;
-- rendimiento, estados de error y observabilidad;
-- pruebas de los recorridos críticos;
-- exportación, respaldo y eliminación segura de datos;
-- revisión de privacidad y seguridad;
-- despliegue estable en Vercel con variables y dominios de producción.
+- Todas las acciones vuelven a autenticar al usuario en el servidor.
+- Las búsquedas directas incluyen `userId`; las políticas RLS siguen protegiendo
+  el acceso realizado con el cliente de Supabase.
+- Las creaciones híbridas usan el outbox existente. Si MongoDB falla, se registra
+  el error y se retira la fila relacional incompleta.
+- Los documentos pasan por Zod antes de escribirse.
+- La migración `stage4_living_album_rules` añade sólo el JSON opcional de reglas
+  automáticas a `albums`, por lo que puede evolucionar después.
 
+Fotografías, audio y dibujo siguen siendo ampliaciones futuras del editor, no
+bloquean los cuatro módulos que definen esta etapa.
