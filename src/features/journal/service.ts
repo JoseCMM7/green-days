@@ -1,10 +1,11 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { findEntryDocument, insertEntryDocument, replaceEntryDocument } from "@/db/mongodb/entry-documents";
 import { entryDocumentSchema, type EntryDocument } from "@/db/mongodb/schemas";
 import { getPostgresDatabase } from "@/db/postgres/client";
-import { journalEntries, outboxEvents } from "@/db/postgres/schema";
+import { emotions, entryEmotions, journalEntries, outboxEvents } from "@/db/postgres/schema";
+import { findMood, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
 import { ensureProfile } from "@/lib/auth/profiles";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { createDefaultBook, type JournalBook } from "./default-book";
@@ -17,6 +18,7 @@ export type JournalEntryDto = {
   entryDate: string;
   revision: number;
   book: JournalBook;
+  primaryMood: MoodOption | null;
 };
 
 async function findRelationalEntry(userId: string, entryDate: string) {
@@ -131,11 +133,24 @@ export async function getOrCreateTodayEntry(user: CurrentUser): Promise<JournalE
     }
   });
 
+  const [primaryEmotion] = await database
+    .select({ slug: emotions.slug })
+    .from(entryEmotions)
+    .innerJoin(emotions, eq(emotions.id, entryEmotions.emotionId))
+    .where(
+      and(
+        eq(entryEmotions.entryId, entry.id),
+        eq(entryEmotions.isPrimary, true),
+      ),
+    )
+    .limit(1);
+
   return {
     entryId: entry.id,
     entryDate,
     revision: document.revision,
     book: document.book,
+    primaryMood: findMood(primaryEmotion?.slug),
   };
 }
 
@@ -143,6 +158,7 @@ export async function saveTodayEntry(input: {
   user: CurrentUser;
   expectedRevision: number;
   book: JournalBook;
+  primaryMoodSlug: MoodSlug | null;
 }) {
   const current = await getOrCreateTodayEntry(input.user);
 
@@ -156,6 +172,23 @@ export async function saveTodayEntry(input: {
   }
 
   const database = getPostgresDatabase();
+  const [selectedMood] = input.primaryMoodSlug
+    ? await database
+        .select({ id: emotions.id, color: emotions.color })
+        .from(emotions)
+        .where(
+          and(
+            eq(emotions.slug, input.primaryMoodSlug),
+            isNull(emotions.userId),
+          ),
+        )
+        .limit(1)
+    : [];
+
+  if (input.primaryMoodSlug && !selectedMood) {
+    throw new Error("La emoción seleccionada todavía no está disponible.");
+  }
+
   const nextRevision = input.expectedRevision + 1;
   const [event] = await database
     .insert(outboxEvents)
@@ -199,10 +232,24 @@ export async function saveTodayEntry(input: {
 
   await database.transaction(async (transaction) => {
     await transaction
+      .delete(entryEmotions)
+      .where(eq(entryEmotions.entryId, current.entryId));
+
+    if (selectedMood) {
+      await transaction.insert(entryEmotions).values({
+        entryId: current.entryId,
+        emotionId: selectedMood.id,
+        intensity: 3,
+        isPrimary: true,
+      });
+    }
+
+    await transaction
       .update(journalEntries)
       .set({
         currentRevision: nextRevision,
         contentStatus: "ready",
+        dayColor: selectedMood?.color ?? null,
         updatedAt: new Date(),
       })
       .where(
@@ -217,5 +264,5 @@ export async function saveTodayEntry(input: {
       .where(eq(outboxEvents.id, event.id));
   });
 
-  return { revision: nextRevision };
+  return { revision: nextRevision, primaryMood: findMood(input.primaryMoodSlug) };
 }

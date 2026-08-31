@@ -27,6 +27,7 @@ export default async function TodayJournalPage() {
           entryDate={entry.entryDate}
           initialRevision={entry.revision}
           initialBook={entry.book}
+          initialPrimaryMood={entry.primaryMood}
         />
       </div>
     </main>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageElement } from "@/db/mongodb/schemas";
+import { moodCatalog, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
 import type { JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
 
@@ -10,6 +11,7 @@ type BookEditorProps = {
   entryDate: string;
   initialRevision: number;
   initialBook: JournalBook;
+  initialPrimaryMood: MoodOption | null;
 };
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "conflict";
@@ -63,6 +65,7 @@ export function BookEditor({
   entryDate,
   initialRevision,
   initialBook,
+  initialPrimaryMood,
 }: BookEditorProps) {
   const [book, setBook] = useState(initialBook);
   const [isOpen, setIsOpen] = useState(false);
@@ -73,8 +76,12 @@ export function BookEditor({
   } | null>(null);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [revision, setRevision] = useState(initialRevision);
+  const [primaryMoodSlug, setPrimaryMoodSlug] = useState<MoodSlug | null>(
+    initialPrimaryMood?.slug ?? null,
+  );
   const bookRef = useRef(book);
   const revisionRef = useRef(revision);
+  const primaryMoodRef = useRef<MoodSlug | null>(primaryMoodSlug);
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
   const saveFunctionRef = useRef<() => Promise<void>>(async () => undefined);
@@ -104,6 +111,7 @@ export function BookEditor({
         body: JSON.stringify({
           expectedRevision: revisionRef.current,
           book: bookRef.current,
+          primaryMoodSlug: primaryMoodRef.current,
         }),
       });
       const result = (await response.json()) as { revision?: number; error?: string };
@@ -139,7 +147,15 @@ export function BookEditor({
     if (!dirtyRef.current) return;
     const timeout = window.setTimeout(() => void saveNow(), 1_100);
     return () => window.clearTimeout(timeout);
-  }, [book, saveNow]);
+  }, [book, primaryMoodSlug, saveNow]);
+
+  function selectMood(slug: MoodSlug) {
+    const nextMood = primaryMoodRef.current === slug ? null : slug;
+    primaryMoodRef.current = nextMood;
+    setPrimaryMoodSlug(nextMood);
+    dirtyRef.current = true;
+    setStatus("unsaved");
+  }
 
   function updateText(pageId: string, elementId: string, text: string) {
     changeBook((draft) => {
@@ -278,6 +294,37 @@ export function BookEditor({
       </div>
 
       <section className="mb-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-4 sm:p-5" aria-label="Herramientas del libro">
+        <div className="mb-5 border-b border-[var(--line)] pb-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">
+                ¿Cómo se sintió este día?
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">Elige una emoción principal; podrás cambiarla cuando quieras.</p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Emoción principal del día">
+              {moodCatalog.map((mood) => {
+                const isSelected = primaryMoodSlug === mood.slug;
+                return (
+                  <button
+                    key={mood.slug}
+                    type="button"
+                    onClick={() => selectMood(mood.slug)}
+                    aria-pressed={isSelected}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition hover:-translate-y-0.5 ${
+                      isSelected
+                        ? "border-[var(--brown)] bg-[#fff3d4] text-[var(--brown-dark)] shadow-sm"
+                        : "border-[var(--line)] bg-[#fff9e9] text-[var(--muted)]"
+                    }`}
+                  >
+                    <span className="text-base" aria-hidden="true">{mood.icon}</span>
+                    {mood.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">

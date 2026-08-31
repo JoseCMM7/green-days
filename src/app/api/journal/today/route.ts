@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { bookSchema } from "@/db/mongodb/schemas";
+import { moodSlugs } from "@/features/calendar/moods";
 import { EntryConflictError, getOrCreateTodayEntry, saveTodayEntry } from "@/features/journal/service";
 import { requireApiUser } from "@/lib/auth/current-user";
 
 const saveSchema = z.object({
   expectedRevision: z.int().positive(),
   book: bookSchema,
+  primaryMoodSlug: z.enum(moodSlugs).nullable(),
 });
 
 function privateJson(data: unknown, init?: ResponseInit) {
