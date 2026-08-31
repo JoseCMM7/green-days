@@ -37,9 +37,10 @@ está activa en Supabase. La pestaña **Mi libro** lleva a `/journal/today`.
 
 ## Límites de esta primera entrega
 
-El núcleo de texto y stickers ya se guarda de verdad. Las fotografías, audio,
-dibujo libre, calendario emocional completo, cápsulas del tiempo, álbumes vivos y
-personalización profunda permanecen para entregas posteriores de la etapa 3.
+El núcleo de texto y stickers ya se guarda de verdad. Las fotografías, audio y
+dibujo libre permanecen como extensiones del editor. El calendario emocional,
+las cápsulas del tiempo, los álbumes vivos y la personalización profunda forman
+la etapa 4.
 
 ## Comprobaciones
 

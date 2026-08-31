@@ -27,8 +27,15 @@ La primera entrega vertical de la etapa 3 ya conecta esas piezas:
 - Autoguardado en MongoDB con historial de revisiones.
 - Registro relacional de cada entrada y eventos de sincronización en PostgreSQL.
 
+La etapa 4 comenzó con el primer módulo de recuerdos conectados:
+
+- Emoción principal seleccionable y persistente en cada entrada.
+- Calendario emocional real con navegación mensual y resumen del mes.
+- Catálogo emocional compartido instalado mediante una migración de Drizzle.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
-[guía de la etapa 3](./docs/stage-3.md).
+[guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
+etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
 
 ## Ejecutar localmente
 
