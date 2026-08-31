@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ensureProfile } from "@/lib/auth/profiles";
 import { createClient } from "@/lib/supabase/server";
+import { SupabaseEnvironmentError } from "@/lib/supabase/environment";
 
 const emailSchema = z.email("Escribe un correo válido.").trim();
 const passwordSchema = z
@@ -27,6 +28,16 @@ export type AuthState = {
   fieldErrors?: Record<string, string[]>;
 };
 
+function configurationErrorState(error: unknown): AuthState | null {
+  if (!(error instanceof SupabaseEnvironmentError)) return null;
+
+  return {
+    status: "error",
+    message:
+      "Falta terminar la conexión con Supabase. Agrega la clave publicable en .env.local y reinicia el servidor.",
+  };
+}
+
 export async function login(
   _previousState: AuthState,
   formData: FormData,
@@ -41,8 +52,17 @@ export async function login(
     };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
+  let result;
+  try {
+    const supabase = await createClient();
+    result = await supabase.auth.signInWithPassword(parsed.data);
+  } catch (error) {
+    const configurationState = configurationErrorState(error);
+    if (configurationState) return configurationState;
+    throw error;
+  }
+
+  const { data, error } = result;
 
   if (error || !data.user) {
     return {
@@ -76,15 +96,24 @@ export async function signUp(
 
   const requestHeaders = await headers();
   const origin = requestHeaders.get("origin") ?? "http://localhost:3000";
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: { display_name: parsed.data.displayName },
-      emailRedirectTo: `${origin}/auth/confirm`,
-    },
-  });
+  let result;
+  try {
+    const supabase = await createClient();
+    result = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      options: {
+        data: { display_name: parsed.data.displayName },
+        emailRedirectTo: `${origin}/auth/confirm`,
+      },
+    });
+  } catch (error) {
+    const configurationState = configurationErrorState(error);
+    if (configurationState) return configurationState;
+    throw error;
+  }
+
+  const { data, error } = result;
 
   if (error || !data.user) {
     return {
