@@ -8,6 +8,7 @@ import { emotions, entryEmotions, journalEntries, outboxEvents } from "@/db/post
 import { findMood, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
 import { ensureProfile } from "@/lib/auth/profiles";
 import type { CurrentUser } from "@/lib/auth/current-user";
+import { getBookAppearance } from "@/features/personalization/service";
 import { createDefaultBook, type JournalBook } from "./default-book";
 import { dateInTimeZone } from "./date";
 
@@ -96,13 +97,14 @@ export async function getOrCreateTodayEntry(user: CurrentUser): Promise<JournalE
 
   if (!document) {
     const now = new Date();
+    const appearance = await getBookAppearance(user.id).catch(() => undefined);
     const newDocument = entryDocumentSchema.parse({
       _id: entry.id,
       userId: user.id,
       entryDate,
       schemaVersion: 1,
       revision: 1,
-      book: createDefaultBook(),
+      book: createDefaultBook(appearance),
       createdAt: now,
       updatedAt: now,
     });

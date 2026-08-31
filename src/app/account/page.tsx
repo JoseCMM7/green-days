@@ -48,6 +48,9 @@ export default async function AccountPage() {
             <Link href="/privacy" className="rounded-full border border-[var(--brown-light)] bg-[#fff3d4] px-5 py-3 text-sm font-bold text-[var(--brown)] transition hover:bg-[var(--yellow-soft)]">
               Cómo protegemos tus datos
             </Link>
+            <Link href="/personalization" className="rounded-full border border-[var(--brown-light)] bg-[#fff3d4] px-5 py-3 text-sm font-bold text-[var(--brown)] transition hover:bg-[var(--yellow-soft)]">
+              Personalizar mi espacio
+            </Link>
             <form action={logout}>
               <button className="rounded-full border border-[var(--brown-light)] bg-[#fff3d4] px-5 py-3 text-sm font-bold text-[var(--brown)] transition hover:bg-[var(--yellow-soft)]">
                 Cerrar sesión

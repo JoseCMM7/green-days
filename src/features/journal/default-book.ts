@@ -2,17 +2,32 @@ import { bookSchema, type EntryDocument } from "@/db/mongodb/schemas";
 
 export type JournalBook = EntryDocument["book"];
 
-export function createDefaultBook(): JournalBook {
+type BookAppearance = {
+  coverColor?: string;
+  spineColor?: string;
+  titleColor?: string;
+  paperColor?: string;
+  textColor?: string;
+  displayFont?: "classic" | "friendly" | "elegant";
+};
+
+const writingFonts = {
+  classic: 'Georgia, "Times New Roman", serif',
+  friendly: '"Segoe Print", "Bradley Hand", cursive',
+  elegant: 'Garamond, Georgia, serif',
+};
+
+export function createDefaultBook(appearance: BookAppearance = {}): JournalBook {
   return bookSchema.parse({
     title: "Mi día",
     cover: {
-      color: "#9a642f",
+      color: appearance.coverColor ?? "#9a642f",
       material: "cloth",
       textureId: "linen-warm",
-      titleColor: "#f8e9bd",
+      titleColor: appearance.titleColor ?? "#f8e9bd",
     },
     spine: {
-      color: "#68411f",
+      color: appearance.spineColor ?? "#68411f",
       width: 72,
     },
     pages: [
@@ -20,6 +35,7 @@ export function createDefaultBook(): JournalBook {
         id: crypto.randomUUID(),
         pageNumber: 1,
         side: "left",
+        backgroundColor: appearance.paperColor ?? "#fbf0d4",
         elements: [
           {
             id: crypto.randomUUID(),
@@ -35,9 +51,9 @@ export function createDefaultBook(): JournalBook {
             },
             content: {
               text: "",
-              fontFamily: "Caveat",
+              fontFamily: writingFonts[appearance.displayFont ?? "friendly"],
               fontSize: 42,
-              color: "#503722",
+              color: appearance.textColor ?? "#503722",
               alignment: "left",
               lineHeight: 1.45,
               weight: "normal",
@@ -49,6 +65,7 @@ export function createDefaultBook(): JournalBook {
         id: crypto.randomUUID(),
         pageNumber: 2,
         side: "right",
+        backgroundColor: appearance.paperColor ?? "#fbf0d4",
         elements: [
           {
             id: crypto.randomUUID(),
@@ -64,9 +81,9 @@ export function createDefaultBook(): JournalBook {
             },
             content: {
               text: "",
-              fontFamily: "Caveat",
+              fontFamily: writingFonts[appearance.displayFont ?? "friendly"],
               fontSize: 42,
-              color: "#503722",
+              color: appearance.textColor ?? "#503722",
               alignment: "left",
               lineHeight: 1.45,
               weight: "normal",

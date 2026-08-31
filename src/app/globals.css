@@ -77,7 +77,16 @@ a {
 }
 
 .font-display {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--display-font, Georgia, "Times New Roman", serif);
+}
+
+.motion-reduced *,
+.motion-reduced *::before,
+.motion-reduced *::after {
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
 }
 
 .memory-illustration {

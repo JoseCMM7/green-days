@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import type { CSSProperties } from "react";
 import { Geist } from "next/font/google";
 import { TopNavigation } from "@/components/top-navigation";
+import { getPersonalization } from "@/features/personalization/service";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,7 +23,11 @@ export const viewport: Viewport = {
   themeColor: "#efe0bd",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const user = await getCurrentUser();
+  const personalization = user
+    ? await getPersonalization(user.id).catch(() => null)
+    : null;
   return (
     <html
       lang="es"
@@ -29,7 +36,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <a href="#main-content" className="skip-link">Saltar al contenido</a>
-        <div className="min-h-screen bg-[var(--cream)] text-[var(--ink)]">
+        <div
+          className={`min-h-screen bg-[var(--cream)] text-[var(--ink)] ${personalization?.reducedMotion ? "motion-reduced" : ""}`}
+          style={personalization?.cssVariables as CSSProperties | undefined}
+        >
           <TopNavigation />
           <div id="main-content" tabIndex={-1}>{children}</div>
         </div>

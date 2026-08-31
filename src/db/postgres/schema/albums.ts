@@ -1,4 +1,4 @@
-import { index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { albumVisibility } from "./enums";
 import { journalEntries } from "./journal";
 import { mediaAssets } from "./media";
@@ -13,6 +13,11 @@ export const albums = pgTable(
       .references(() => profiles.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
+    autoRule: jsonb("auto_rule").$type<{
+      fromDate?: string;
+      toDate?: string;
+      emotionSlug?: string;
+    }>(),
     coverMediaId: uuid("cover_media_id").references(() => mediaAssets.id, {
       onDelete: "set null",
     }),

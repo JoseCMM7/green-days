@@ -458,6 +458,7 @@ export function BookEditor({
                         style={{
                           ...frameStyle,
                           color: element.content.color,
+                          fontFamily: element.content.fontFamily,
                           textAlign: element.content.alignment,
                           lineHeight: element.content.lineHeight,
                         }}
@@ -491,12 +492,13 @@ export function BookEditor({
           <button
             type="button"
             className="book-cover"
+            style={{ backgroundColor: book.cover.color, color: book.cover.titleColor }}
             onClick={() => setIsOpen(true)}
             aria-label="Abrir el libro de hoy"
             aria-hidden={isOpen}
             tabIndex={isOpen ? -1 : 0}
           >
-            <span className="book-cover-spine" />
+            <span className="book-cover-spine" style={{ background: book.spine.color }} />
             <span className="book-cover-border">
               <span className="book-cover-kicker">Green Days</span>
               <strong>Mi día</strong>
