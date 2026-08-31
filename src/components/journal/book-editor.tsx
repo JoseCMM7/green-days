@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageElement } from "@/db/mongodb/schemas";
 import { moodCatalog, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
@@ -26,10 +27,11 @@ type BookEditorProps = {
 };
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "conflict";
-type StickerElement = Extract<PageElement, { type: "sticker" }>;
 type DrawingElement = Extract<PageElement, { type: "drawing" }>;
 type DrawingPoint = DrawingElement["content"]["paths"][number][number];
 type EditorTool = "write" | "draw";
+type MediaStatus = "idle" | "uploading" | "recording" | "error";
+type HistoryItem = { revision: number; savedAt: string; pageCount: number; excerpt: string };
 
 const stickerPalette = [
   { id: "pressed-flower", glyph: "🌼", label: "Flor" },
@@ -43,6 +45,7 @@ const stickerPalette = [
 const stickerGlyphs = Object.fromEntries(
   stickerPalette.map((sticker) => [sticker.id, sticker.glyph]),
 );
+const historyDateFormatter = new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" });
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -89,10 +92,15 @@ export function BookEditor({
   const [drawingColor, setDrawingColor] = useState("#805735");
   const [drawingWidth, setDrawingWidth] = useState(8);
   const [drawingPreview, setDrawingPreview] = useState<DrawingPoint[]>([]);
-  const [selectedSticker, setSelectedSticker] = useState<{
+  const [selectedElement, setSelectedElement] = useState<{
     pageId: string;
     elementId: string;
   } | null>(null);
+  const [mediaStatus, setMediaStatus] = useState<MediaStatus>("idle");
+  const [mediaMessage, setMediaMessage] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "error" | "restoring">("idle");
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [revision, setRevision] = useState(initialRevision);
   const [primaryMoodSlug, setPrimaryMoodSlug] = useState<MoodSlug | null>(
@@ -105,6 +113,12 @@ export function BookEditor({
   const savingRef = useRef(false);
   const drawingPathRef = useRef<DrawingPoint[]>([]);
   const drawingPageRef = useRef<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const pendingMediaDeletionsRef = useRef(new Set<string>());
   const saveFunctionRef = useRef<() => Promise<void>>(async () => undefined);
 
   const changeBook = useCallback((transform: (draft: JournalBook) => void) => {
@@ -126,7 +140,7 @@ export function BookEditor({
     setStatus("saving");
 
     try {
-      const response = await fetch("/api/journal/today", {
+      const response = await fetch(`/api/journal/${entryDate}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -148,6 +162,10 @@ export function BookEditor({
 
       revisionRef.current = result.revision;
       setRevision(result.revision);
+      for (const mediaId of pendingMediaDeletionsRef.current) {
+        const deleteResponse = await fetch(`/api/media/${mediaId}`, { method: "DELETE" });
+        if (deleteResponse.ok) pendingMediaDeletionsRef.current.delete(mediaId);
+      }
       setStatus(dirtyRef.current ? "unsaved" : "saved");
     } catch {
       dirtyRef.current = true;
@@ -158,7 +176,7 @@ export function BookEditor({
         window.setTimeout(() => void saveFunctionRef.current(), 500);
       }
     }
-  }, []);
+  }, [entryDate]);
 
   useEffect(() => {
     saveFunctionRef.current = saveNow;
@@ -169,6 +187,10 @@ export function BookEditor({
     const timeout = window.setTimeout(() => void saveNow(), 1_100);
     return () => window.clearTimeout(timeout);
   }, [book, primaryMoodSlug, saveNow]);
+
+  useEffect(() => () => {
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   function selectMood(slug: MoodSlug) {
     const nextMood = primaryMoodRef.current === slug ? null : slug;
@@ -183,7 +205,7 @@ export function BookEditor({
     const [firstPage] = pagesInSpread(bookRef.current, safeIndex);
     setSpreadIndex(safeIndex);
     if (firstPage) setActivePageId(firstPage.id);
-    setSelectedSticker(null);
+    setSelectedElement(null);
     setDrawingPreview([]);
   }
 
@@ -194,7 +216,7 @@ export function BookEditor({
     changeBook((draft) => { draft.pages.push(...newPages); });
     setSpreadIndex(nextSpreadIndex);
     setActivePageId(newPages[0].id);
-    setSelectedSticker(null);
+    setSelectedElement(null);
   }
 
   function removeLastSpread() {
@@ -204,7 +226,7 @@ export function BookEditor({
     const [firstPage] = pagesInSpread(bookRef.current, nextIndex);
     setSpreadIndex(nextIndex);
     if (firstPage) setActivePageId(firstPage.id);
-    setSelectedSticker(null);
+    setSelectedElement(null);
   }
 
   function drawingPoint(event: React.PointerEvent<HTMLElement>) {
@@ -227,7 +249,7 @@ export function BookEditor({
     drawingPathRef.current = [point];
     setDrawingPreview([point]);
     setActivePageId(pageId);
-    setSelectedSticker(null);
+    setSelectedElement(null);
   }
 
   function continueDrawing(event: React.PointerEvent<HTMLDivElement>) {
@@ -268,6 +290,112 @@ export function BookEditor({
     });
   }
 
+  async function uploadMedia(file: File) {
+    setMediaStatus("uploading");
+    setMediaMessage("Subiendo…");
+    const formData = new FormData();
+    formData.set("file", file);
+    try {
+      const response = await fetch(`/api/journal/${entryDate}/media`, { method: "POST", body: formData });
+      const result = (await response.json()) as { id?: string; kind?: "photo" | "audio"; error?: string };
+      if (!response.ok || !result.id || !result.kind) throw new Error(result.error ?? "No se pudo subir.");
+      const elementId = crypto.randomUUID();
+      changeBook((draft) => {
+        const page = draft.pages.find((candidate) => candidate.id === activePageId);
+        if (!page) return;
+        const zIndex = Math.max(20, ...page.elements.map((element) => element.frame.zIndex + 1));
+        if (result.kind === "photo") {
+          page.elements.push({
+            id: elementId, type: "photo",
+            frame: { x: 180, y: 260, width: 640, height: 560, rotation: -2, zIndex, locked: false },
+            content: { mediaId: result.id!, fit: "cover", cropX: 0.5, cropY: 0.5, filter: "none", caption: file.name.slice(0, 120) },
+          });
+        } else {
+          page.elements.push({
+            id: elementId, type: "audio",
+            frame: { x: 130, y: 520, width: 740, height: 190, rotation: 0, zIndex, locked: false },
+            content: { mediaId: result.id!, label: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Recuerdo de audio", waveformColor: "#b8781d" },
+          });
+        }
+      });
+      setSelectedElement({ pageId: activePageId, elementId });
+      setEditorTool("write");
+      setMediaStatus("idle");
+      setMediaMessage(result.kind === "photo" ? "Fotografía añadida." : "Audio añadido.");
+    } catch (error) {
+      setMediaStatus("error");
+      setMediaMessage(error instanceof Error ? error.message : "No pudimos subir el archivo.");
+    }
+  }
+
+  async function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setMediaStatus("error");
+      setMediaMessage("Este navegador no permite grabar audio.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm", "audio/ogg", "audio/mp4"]
+        .find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordingStreamRef.current = stream;
+      recordingChunksRef.current = [];
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => { if (event.data.size) recordingChunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        const recordedType = recorder.mimeType.split(";")[0] || mimeType || "audio/webm";
+        const extension = recordedType === "audio/ogg" ? "ogg" : recordedType === "audio/mp4" ? "m4a" : "webm";
+        const blob = new Blob(recordingChunksRef.current, { type: recordedType });
+        recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        recorderRef.current = null;
+        void uploadMedia(new File([blob], `audio-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`, { type: recordedType }));
+      };
+      recorder.start();
+      setMediaStatus("recording");
+      setMediaMessage("Grabando… habla con calma.");
+    } catch {
+      setMediaStatus("error");
+      setMediaMessage("No obtuvimos permiso para usar el micrófono.");
+    }
+  }
+
+  function stopRecording() {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  }
+
+  async function toggleHistory() {
+    if (historyOpen) { setHistoryOpen(false); return; }
+    setHistoryOpen(true);
+    setHistoryStatus("loading");
+    try {
+      const response = await fetch(`/api/journal/${entryDate}/history`, { cache: "no-store" });
+      const result = (await response.json()) as { versions?: HistoryItem[]; error?: string };
+      if (!response.ok) throw new Error(result.error);
+      setHistoryItems(result.versions ?? []);
+      setHistoryStatus("idle");
+    } catch {
+      setHistoryStatus("error");
+    }
+  }
+
+  async function restoreRevision(targetRevision: number) {
+    if (!window.confirm(`¿Restaurar la revisión ${targetRevision}? La versión actual se conservará en el historial.`)) return;
+    setHistoryStatus("restoring");
+    if (dirtyRef.current) {
+      await saveNow();
+      if (dirtyRef.current) { setHistoryStatus("error"); return; }
+    }
+    const response = await fetch(`/api/journal/${entryDate}/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revision: targetRevision }),
+    });
+    if (response.ok) window.location.reload();
+    else setHistoryStatus("error");
+  }
+
   function updateText(pageId: string, elementId: string, text: string) {
     changeBook((draft) => {
       const page = draft.pages.find((candidate) => candidate.id === pageId);
@@ -303,55 +431,58 @@ export function BookEditor({
         },
       });
     });
-    setSelectedSticker({ pageId, elementId });
+    setSelectedElement({ pageId, elementId });
   }
 
-  function updateSticker(pageId: string, elementId: string, transform: (sticker: StickerElement) => void) {
+  function updateElement(pageId: string, elementId: string, transform: (element: PageElement) => void) {
     changeBook((draft) => {
       const element = draft.pages
         .find((page) => page.id === pageId)
         ?.elements.find((candidate) => candidate.id === elementId);
-      if (element?.type === "sticker") transform(element);
+      if (element) transform(element);
     });
   }
 
-  function deleteSelectedSticker() {
-    if (!selectedSticker) return;
+  function deleteSelectedElement() {
+    if (!selectedElement) return;
     changeBook((draft) => {
-      const page = draft.pages.find((candidate) => candidate.id === selectedSticker.pageId);
+      const page = draft.pages.find((candidate) => candidate.id === selectedElement.pageId);
       if (page) {
+        const element = page.elements.find((candidate) => candidate.id === selectedElement.elementId);
+        if (element?.type === "photo" || element?.type === "audio") pendingMediaDeletionsRef.current.add(element.content.mediaId);
         page.elements = page.elements.filter(
-          (element) => element.id !== selectedSticker.elementId,
+          (element) => element.id !== selectedElement.elementId,
         );
       }
     });
-    setSelectedSticker(null);
+    setSelectedElement(null);
   }
 
-  function handleStickerPointerDown(
-    event: React.PointerEvent<HTMLButtonElement>,
+  function handleElementPointerDown(
+    event: React.PointerEvent<HTMLElement>,
     pageId: string,
-    sticker: StickerElement,
+    element: PageElement,
   ) {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setActivePageId(pageId);
-    setSelectedSticker({ pageId, elementId: sticker.id });
+    setSelectedElement({ pageId, elementId: element.id });
+    if (element.frame.locked) return;
 
     const pageElement = event.currentTarget.closest<HTMLElement>("[data-book-page]");
     if (!pageElement) return;
     const pageRect = pageElement.getBoundingClientRect();
     const startX = event.clientX;
     const startY = event.clientY;
-    const initialX = sticker.frame.x;
-    const initialY = sticker.frame.y;
+    const initialX = element.frame.x;
+    const initialY = element.frame.y;
 
     function move(pointerEvent: PointerEvent) {
       const deltaX = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
       const deltaY = ((pointerEvent.clientY - startY) / pageRect.height) * 1400;
-      updateSticker(pageId, sticker.id, (draftSticker) => {
-        draftSticker.frame.x = clamp(initialX + deltaX, 0, 1000 - draftSticker.frame.width);
-        draftSticker.frame.y = clamp(initialY + deltaY, 0, 1400 - draftSticker.frame.height);
+      updateElement(pageId, element.id, (draftElement) => {
+        draftElement.frame.x = clamp(initialX + deltaX, 0, 1000 - draftElement.frame.width);
+        draftElement.frame.y = clamp(initialY + deltaY, 0, 1400 - draftElement.frame.height);
       });
     }
 
@@ -364,10 +495,10 @@ export function BookEditor({
     window.addEventListener("pointerup", finish, { once: true });
   }
 
-  const selectedStickerData = selectedSticker
+  const selectedElementData = selectedElement
     ? book.pages
-        .find((page) => page.id === selectedSticker.pageId)
-        ?.elements.find((element) => element.id === selectedSticker.elementId)
+        .find((page) => page.id === selectedElement.pageId)
+        ?.elements.find((element) => element.id === selectedElement.elementId)
     : null;
   const visiblePages = pagesInSpread(book, spreadIndex);
   const totalSpreads = spreadCount(book);
@@ -385,6 +516,7 @@ export function BookEditor({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SaveIndicator status={status} />
+          <button type="button" onClick={() => void toggleHistory()} className="rounded-full border border-[var(--brown-light)] bg-[#fff3d4] px-4 py-2 text-xs font-bold text-[var(--brown)]">{historyOpen ? "Cerrar historial" : "Historial"}</button>
           {(status === "error" || status === "unsaved") && (
             <button
               type="button"
@@ -405,6 +537,18 @@ export function BookEditor({
           )}
         </div>
       </div>
+
+      {historyOpen && (
+        <section className="mb-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-5" aria-labelledby="history-title">
+          <div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--ochre)]">Red de seguridad</p><h2 id="history-title" className="font-display text-2xl font-semibold">Versiones anteriores</h2></div><span className="text-xs text-[var(--muted)]">Actual: revisión {revision}</span></div>
+          {historyStatus === "loading" && <p className="mt-4 text-sm text-[var(--muted)]">Buscando versiones…</p>}
+          {historyStatus === "error" && <p className="mt-4 text-sm font-semibold text-[#843a28]">No pudimos completar esta operación.</p>}
+          {historyStatus !== "loading" && historyItems.length === 0 && <p className="mt-4 text-sm text-[var(--muted)]">El historial aparecerá después del primer cambio guardado.</p>}
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {historyItems.map((item) => <article key={`${item.revision}-${item.savedAt}`} className="rounded-2xl border border-[var(--line)] bg-[#fff8e8] p-4"><p className="text-xs font-bold text-[var(--ochre)]">Revisión {item.revision} · {item.pageCount} páginas</p><p className="mt-2 line-clamp-3 min-h-12 text-sm leading-6 text-[var(--muted)]">{item.excerpt || "Una versión principalmente visual."}</p><div className="mt-3 flex items-center justify-between gap-3"><time className="text-[0.65rem] text-[var(--muted)]">{historyDateFormatter.format(new Date(item.savedAt))}</time><button type="button" disabled={historyStatus === "restoring"} onClick={() => void restoreRevision(item.revision)} className="text-xs font-bold text-[var(--brown)] underline underline-offset-4">Restaurar</button></div></article>)}
+          </div>
+        </section>
+      )}
 
       <section className="mb-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-4 sm:p-5" aria-label="Herramientas del libro">
         <div className="mb-5 border-b border-[var(--line)] pb-5">
@@ -443,7 +587,7 @@ export function BookEditor({
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">Herramienta creativa</p>
             <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Herramienta activa">
               <button type="button" disabled={!isOpen} onClick={() => setEditorTool("write")} aria-pressed={editorTool === "write"} className={`tool-pill ${editorTool === "write" ? "bg-[var(--yellow-soft)]" : ""}`}>✍️ Escribir y mover</button>
-              <button type="button" disabled={!isOpen} onClick={() => { setEditorTool("draw"); setSelectedSticker(null); }} aria-pressed={editorTool === "draw"} className={`tool-pill ${editorTool === "draw" ? "bg-[var(--yellow-soft)]" : ""}`}>🖍️ Dibujar</button>
+              <button type="button" disabled={!isOpen} onClick={() => { setEditorTool("draw"); setSelectedElement(null); }} aria-pressed={editorTool === "draw"} className={`tool-pill ${editorTool === "draw" ? "bg-[var(--yellow-soft)]" : ""}`}>🖍️ Dibujar</button>
             </div>
           </div>
           {editorTool === "draw" && (
@@ -456,6 +600,17 @@ export function BookEditor({
           )}
         </div>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">Fotos y audio</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMedia(file); event.currentTarget.value = ""; }} />
+              <input ref={audioInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/webm,audio/ogg,audio/wav" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMedia(file); event.currentTarget.value = ""; }} />
+              <button type="button" disabled={!isOpen || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => photoInputRef.current?.click()} className="tool-pill disabled:opacity-40">📷 Fotografía</button>
+              <button type="button" disabled={!isOpen || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => audioInputRef.current?.click()} className="tool-pill disabled:opacity-40">🎵 Adjuntar audio</button>
+              {mediaStatus === "recording" ? <button type="button" onClick={stopRecording} className="rounded-full bg-[#d96b55] px-4 py-2 text-xs font-bold text-white">■ Detener</button> : <button type="button" disabled={!isOpen || mediaStatus === "uploading"} onClick={() => void startRecording()} className="tool-pill disabled:opacity-40">🎙️ Grabar</button>}
+            </div>
+            {mediaMessage && <p className={`mt-2 max-w-xs text-xs ${mediaStatus === "error" ? "text-[#843a28]" : "text-[var(--muted)]"}`} role="status">{mediaStatus === "uploading" ? "Subiendo…" : mediaMessage}</p>}
+          </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">
               Stickers
@@ -499,14 +654,14 @@ export function BookEditor({
             <button type="button" onClick={addSpread} disabled={!isOpen || book.pages.length >= MAX_JOURNAL_PAGES} className="tool-pill disabled:opacity-40">+ Dos páginas</button>
             {book.pages.length > 2 && <button type="button" onClick={removeLastSpread} className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]">Quitar últimas</button>}
 
-            {selectedStickerData?.type === "sticker" && selectedSticker && (
+            {selectedElementData && selectedElement && selectedElementData.type !== "text" && selectedElementData.type !== "drawing" && (
               <>
                 <span className="mx-1 h-7 w-px bg-[var(--line)]" />
                 <button
                   type="button"
                   onClick={() =>
-                    updateSticker(selectedSticker.pageId, selectedSticker.elementId, (sticker) => {
-                      sticker.frame.rotation = (sticker.frame.rotation + 15) % 360;
+                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
+                      element.frame.rotation = (element.frame.rotation + 15) % 360;
                     })
                   }
                   className="tool-pill"
@@ -516,12 +671,14 @@ export function BookEditor({
                 <button
                   type="button"
                   onClick={() =>
-                    updateSticker(selectedSticker.pageId, selectedSticker.elementId, (sticker) => {
-                      const nextSize = clamp(sticker.frame.width + 30, 90, 360);
-                      sticker.frame.width = nextSize;
-                      sticker.frame.height = nextSize;
-                      sticker.frame.x = clamp(sticker.frame.x, 0, 1000 - nextSize);
-                      sticker.frame.y = clamp(sticker.frame.y, 0, 1400 - nextSize);
+                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
+                      const ratio = element.frame.height / element.frame.width;
+                      const nextWidth = clamp(element.frame.width + 40, 90, 900);
+                      const nextHeight = clamp(nextWidth * ratio, 80, 1100);
+                      element.frame.width = nextWidth;
+                      element.frame.height = nextHeight;
+                      element.frame.x = clamp(element.frame.x, 0, 1000 - nextWidth);
+                      element.frame.y = clamp(element.frame.y, 0, 1400 - nextHeight);
                     })
                   }
                   className="tool-pill"
@@ -532,10 +689,11 @@ export function BookEditor({
                 <button
                   type="button"
                   onClick={() =>
-                    updateSticker(selectedSticker.pageId, selectedSticker.elementId, (sticker) => {
-                      const nextSize = clamp(sticker.frame.width - 30, 90, 360);
-                      sticker.frame.width = nextSize;
-                      sticker.frame.height = nextSize;
+                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
+                      const ratio = element.frame.height / element.frame.width;
+                      const nextWidth = clamp(element.frame.width - 40, 90, 900);
+                      element.frame.width = nextWidth;
+                      element.frame.height = clamp(nextWidth * ratio, 80, 1100);
                     })
                   }
                   className="tool-pill"
@@ -543,9 +701,16 @@ export function BookEditor({
                 >
                   −
                 </button>
+                <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
+                  const page = bookRef.current.pages.find((candidate) => candidate.id === selectedElement.pageId);
+                  element.frame.zIndex = Math.max(0, ...(page?.elements.map((candidate) => candidate.frame.zIndex) ?? [0])) + 1;
+                })} className="tool-pill">Al frente</button>
+                <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { element.frame.zIndex = 0; })} className="tool-pill">Al fondo</button>
+                <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { element.frame.locked = !element.frame.locked; })} className="tool-pill">{selectedElementData.frame.locked ? "Desbloquear" : "Bloquear"}</button>
+                {selectedElementData.type === "photo" && <select value={selectedElementData.content.filter} onChange={(event) => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { if (element.type === "photo") element.content.filter = event.target.value as "none" | "warm" | "vintage" | "mono"; })} className="tool-pill"><option value="none">Sin filtro</option><option value="warm">Cálido</option><option value="vintage">Vintage</option><option value="mono">Blanco y negro</option></select>}
                 <button
                   type="button"
-                  onClick={deleteSelectedSticker}
+                  onClick={deleteSelectedElement}
                   className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]"
                 >
                   Quitar
@@ -618,13 +783,41 @@ export function BookEditor({
                     );
                   }
 
-                  if (element.type === "sticker") {
-                    const isSelected = selectedSticker?.elementId === element.id;
+                  if (element.type === "photo") {
+                    const filters = { none: "none", warm: "sepia(.18) saturate(1.12)", vintage: "sepia(.42) contrast(.92)", mono: "grayscale(1)" };
+                    const isSelected = selectedElement?.elementId === element.id;
                     return (
                       <button
                         key={element.id}
                         type="button"
-                        onPointerDown={(event) => handleStickerPointerDown(event, page.id, element)}
+                        onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
+                        className={`absolute overflow-hidden rounded-[4%] border-4 bg-[#fff8e8] shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-white"}`}
+                        style={frameStyle}
+                        aria-label={`Fotografía${element.content.caption ? `: ${element.content.caption}` : ""}. Arrástrala para moverla.`}
+                      >
+                        <Image src={`/api/media/${element.content.mediaId}`} alt={element.content.caption ?? "Fotografía del diario"} fill unoptimized sizes="40vw" className={element.content.fit === "cover" ? "object-cover" : "object-contain"} style={{ filter: filters[element.content.filter], objectPosition: `${element.content.cropX * 100}% ${element.content.cropY * 100}%` }} />
+                        {element.frame.locked && <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[0.55rem] text-white">🔒</span>}
+                      </button>
+                    );
+                  }
+
+                  if (element.type === "audio") {
+                    const isSelected = selectedElement?.elementId === element.id;
+                    return (
+                      <div key={element.id} className={`absolute overflow-hidden rounded-2xl border bg-[#fff7e2] p-3 shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-[var(--line)]"}`} style={frameStyle}>
+                        <button type="button" onPointerDown={(event) => handleElementPointerDown(event, page.id, element)} className="mb-2 flex w-full cursor-grab items-center justify-between gap-2 text-left text-[0.65rem] font-bold text-[var(--brown)]" aria-label={`Mover audio ${element.content.label}`}><span className="truncate">🎵 {element.content.label}</span><span aria-hidden="true">{element.frame.locked ? "🔒" : "⠿"}</span></button>
+                        <audio controls preload="metadata" src={`/api/media/${element.content.mediaId}`} className="h-9 w-full" aria-label={element.content.label} />
+                      </div>
+                    );
+                  }
+
+                  if (element.type === "sticker") {
+                    const isSelected = selectedElement?.elementId === element.id;
+                    return (
+                      <button
+                        key={element.id}
+                        type="button"
+                        onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
                         className={`page-sticker ${isSelected ? "is-selected" : ""}`}
                         style={{ ...frameStyle, opacity: element.content.opacity }}
                         aria-label={`Sticker ${element.content.stickerId}. Arrástralo para moverlo.`}

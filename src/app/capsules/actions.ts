@@ -20,6 +20,7 @@ export async function createCapsuleAction(
     paperColor: formData.get("paperColor"),
     revealStyle: formData.get("revealStyle"),
     sealStickerId: formData.get("sealStickerId") || undefined,
+    sourceEntryId: formData.get("sourceEntryId") || "",
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Revisa los datos." };

@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { capsuleDocumentSchema } from "@/db/mongodb/schemas";
 import { getMongoCollections } from "@/db/mongodb/collections";
 import { getPostgresDatabase } from "@/db/postgres/client";
-import { outboxEvents, timeCapsules } from "@/db/postgres/schema";
+import { journalEntries, outboxEvents, timeCapsules } from "@/db/postgres/schema";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { ensureProfile } from "@/lib/auth/profiles";
 import { canOpenCapsule, type CapsuleInput, unlockDateFromInput } from "./model";
@@ -19,6 +19,17 @@ export async function listCapsules(userId: string) {
 export async function createCapsule(user: CurrentUser, input: CapsuleInput) {
   await ensureProfile({ id: user.id, email: user.email, displayName: user.displayName });
   const database = getPostgresDatabase();
+  if (input.sourceEntryId) {
+    const [ownedSource] = await database
+      .select({ id: journalEntries.id })
+      .from(journalEntries)
+      .where(and(
+        eq(journalEntries.id, input.sourceEntryId),
+        eq(journalEntries.userId, user.id),
+      ))
+      .limit(1);
+    if (!ownedSource) throw new Error("No encontramos la entrada que quieres vincular.");
+  }
   const capsuleId = crypto.randomUUID();
   const now = new Date();
   const [event] = await database.transaction(async (transaction) => {
@@ -27,6 +38,7 @@ export async function createCapsule(user: CurrentUser, input: CapsuleInput) {
       userId: user.id,
       title: input.title,
       status: "sealed",
+      sourceEntryId: input.sourceEntryId ?? null,
       unlocksAt: unlockDateFromInput(input.unlockDate),
       sealedAt: now,
     });
@@ -82,7 +94,17 @@ export async function getCapsule(userId: string, capsuleId: string) {
 
   const collections = await getMongoCollections();
   const document = await collections.capsuleDocuments.findOne({ _id: capsuleId, userId });
-  return { capsule, document };
+  const [sourceEntry] = capsule.sourceEntryId
+    ? await database
+        .select({ entryDate: journalEntries.entryDate })
+        .from(journalEntries)
+        .where(and(
+          eq(journalEntries.id, capsule.sourceEntryId),
+          eq(journalEntries.userId, userId),
+        ))
+        .limit(1)
+    : [];
+  return { capsule, document, sourceEntryDate: sourceEntry?.entryDate ?? null };
 }
 
 export async function openCapsule(userId: string, capsuleId: string) {

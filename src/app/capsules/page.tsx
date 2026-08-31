@@ -4,6 +4,7 @@ import { CapsuleComposer } from "@/components/capsules/capsule-composer";
 import { FeaturePageShell } from "@/components/feature-page-shell";
 import { daysUntilCapsule } from "@/features/capsules/model";
 import { listCapsules } from "@/features/capsules/service";
+import { listJournalEntryChoices } from "@/features/journal/service";
 import { requireUser } from "@/lib/auth/current-user";
 
 export const metadata: Metadata = { title: "Cápsulas del tiempo — Green Days" };
@@ -11,16 +12,21 @@ export const dynamic = "force-dynamic";
 
 const dateFormatter = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-export default async function CapsulesPage() {
+export default async function CapsulesPage({ searchParams }: { searchParams: Promise<{ entry?: string }> }) {
   const user = await requireUser();
-  const capsules = await listCapsules(user.id);
+  const [{ entry: requestedEntry }, capsules, entries] = await Promise.all([
+    searchParams,
+    listCapsules(user.id),
+    listJournalEntryChoices(user.id),
+  ]);
+  const defaultSourceEntryId = entries.some((entry) => entry.id === requestedEntry) ? requestedEntry : undefined;
   const next = capsules.find((item) => item.status === "sealed");
 
   return (
     <FeaturePageShell eyebrow="Mensajes que sabrán esperar" title="Cápsulas del tiempo" description="Escribe para tu yo del futuro y decide cuándo podrás volver a encontrar esas palabras.">
       <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-7">
-          <CapsuleComposer />
+          <CapsuleComposer entries={entries} defaultSourceEntryId={defaultSourceEntryId} />
           <section className="rounded-[1.8rem] border border-[var(--line)] bg-[var(--paper)] p-6 shadow-[0_18px_50px_rgba(91,59,32,0.1)] sm:p-8" aria-labelledby="sealed-capsules-title">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ochre)]">Tu correspondencia en el tiempo</p>
             <h2 id="sealed-capsules-title" className="font-display mt-1 text-3xl font-semibold">Cápsulas guardadas</h2>

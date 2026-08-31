@@ -5,7 +5,12 @@ import { createCapsuleAction, type CapsuleActionState } from "@/app/capsules/act
 
 const initialState: CapsuleActionState = { status: "idle" };
 
-export function CapsuleComposer() {
+type EntryChoice = { id: string; entryDate: string; title: string | null };
+
+export function CapsuleComposer({ entries, defaultSourceEntryId }: {
+  entries: EntryChoice[];
+  defaultSourceEntryId?: string;
+}) {
   const [state, action, pending] = useActionState(createCapsuleAction, initialState);
 
   return (
@@ -18,6 +23,12 @@ export function CapsuleComposer() {
         </label>
         <label className="grid gap-2 text-sm font-bold">Mensaje
           <textarea name="message" required maxLength={50000} rows={7} className="resize-y rounded-2xl border border-[var(--line)] bg-[#fff8e8] px-4 py-3 font-normal leading-7" placeholder="Quiero que recuerdes…" />
+        </label>
+        <label className="grid gap-2 text-sm font-bold">Conectar con una entrada del diario <span className="font-normal text-[var(--muted)]">(opcional)</span>
+          <select name="sourceEntryId" defaultValue={defaultSourceEntryId ?? ""} className="rounded-2xl border border-[var(--line)] bg-[#fff8e8] px-4 py-3 font-normal">
+            <option value="">Sin entrada vinculada</option>
+            {entries.map((entry) => <option key={entry.id} value={entry.id}>{entry.entryDate} · {entry.title ?? "Mi día"}</option>)}
+          </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="grid gap-2 text-sm font-bold">Abrir el día

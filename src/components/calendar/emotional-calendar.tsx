@@ -169,6 +169,9 @@ export function EmotionalCalendar({ initialData }: { initialData: CalendarMonthD
             ) : (
               <p className="mt-2 text-sm text-[var(--muted)]">Todavía no hay una entrada guardada en este día.</p>
             )}
+            <Link href={`/journal/${selectedDate}`} className="mt-4 inline-flex rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold text-[var(--brown-dark)]">
+              {selectedEntry ? "Abrir este libro" : "Escribir en este día"}
+            </Link>
           </div>
         )}
 
@@ -208,4 +211,3 @@ export function EmotionalCalendar({ initialData }: { initialData: CalendarMonthD
     </div>
   );
 }
-

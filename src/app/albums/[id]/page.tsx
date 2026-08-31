@@ -29,6 +29,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
             <article key={entry.id} className={`rounded-[1.6rem] border border-[var(--line)] bg-[var(--paper)] p-6 shadow-[0_16px_40px_rgba(91,59,32,0.1)] ${presentation?.layout === "scrapbook" && index % 2 ? "rotate-1" : "-rotate-[0.3deg]"}`} style={{ borderTopColor: entry.dayColor ?? presentation?.accentColor ?? "var(--ochre)", borderTopWidth: 8 }}>
               <p className="text-xs font-bold uppercase tracking-[0.13em] text-[var(--ochre)]">{dateFormatter.format(new Date(`${entry.entryDate}T12:00:00Z`))}</p>
               <h2 className="font-display mt-3 text-2xl font-semibold">{entry.title || "Mi día"}</h2>
+              <Link href={`/journal/${entry.entryDate}`} className="mt-4 inline-flex text-xs font-bold text-[var(--ochre)] underline underline-offset-4">Abrir el libro</Link>
               {!album.autoRule && <form action={removeAlbumEntryAction.bind(null, id, entry.id)} className="mt-5"><button className="text-xs font-bold text-[var(--brown)] underline decoration-[var(--brown-light)] underline-offset-4">Quitar del álbum</button></form>}
             </article>
           ))}

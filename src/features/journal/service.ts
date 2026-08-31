@@ -1,8 +1,8 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
-import { findEntryDocument, insertEntryDocument, replaceEntryDocument } from "@/db/mongodb/entry-documents";
-import { entryDocumentSchema, type EntryDocument } from "@/db/mongodb/schemas";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { findEntryDocument, findEntryVersion, insertEntryDocument, listEntryVersions, replaceEntryDocument } from "@/db/mongodb/entry-documents";
+import { entryDocumentSchema, type EntryDocument, type PageElement } from "@/db/mongodb/schemas";
 import { getPostgresDatabase } from "@/db/postgres/client";
 import { emotions, entryEmotions, journalEntries, outboxEvents } from "@/db/postgres/schema";
 import { findMood, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
@@ -10,7 +10,7 @@ import { ensureProfile } from "@/lib/auth/profiles";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { getBookAppearance } from "@/features/personalization/service";
 import { createDefaultBook, type JournalBook } from "./default-book";
-import { dateInTimeZone } from "./date";
+import { dateInTimeZone, isEntryDate } from "./date";
 
 export class EntryConflictError extends Error {}
 
@@ -38,13 +38,17 @@ async function findRelationalEntry(userId: string, entryDate: string) {
   return entry;
 }
 
-export async function getOrCreateTodayEntry(user: CurrentUser): Promise<JournalEntryDto> {
+export async function getOrCreateEntry(user: CurrentUser, requestedDate?: string): Promise<JournalEntryDto> {
   const profile = await ensureProfile({
     id: user.id,
     email: user.email,
     displayName: user.displayName,
   });
-  const entryDate = dateInTimeZone(profile.timeZone);
+  const today = dateInTimeZone(profile.timeZone);
+  const entryDate = requestedDate ?? today;
+  if (!isEntryDate(entryDate) || entryDate > today) {
+    throw new Error("La fecha de la entrada no es válida.");
+  }
   const database = getPostgresDatabase();
   let entry = await findRelationalEntry(user.id, entryDate);
   let outboxId: string | null = null;
@@ -156,13 +160,35 @@ export async function getOrCreateTodayEntry(user: CurrentUser): Promise<JournalE
   };
 }
 
+export async function getOrCreateTodayEntry(user: CurrentUser) {
+  return getOrCreateEntry(user);
+}
+
+export async function listJournalEntryChoices(userId: string) {
+  return getPostgresDatabase()
+    .select({ id: journalEntries.id, entryDate: journalEntries.entryDate, title: journalEntries.title })
+    .from(journalEntries)
+    .where(and(eq(journalEntries.userId, userId), isNull(journalEntries.deletedAt)))
+    .orderBy(desc(journalEntries.entryDate));
+}
+
 export async function saveTodayEntry(input: {
   user: CurrentUser;
   expectedRevision: number;
   book: JournalBook;
   primaryMoodSlug: MoodSlug | null;
 }) {
-  const current = await getOrCreateTodayEntry(input.user);
+  return saveEntry(input);
+}
+
+export async function saveEntry(input: {
+  user: CurrentUser;
+  entryDate?: string;
+  expectedRevision: number;
+  book: JournalBook;
+  primaryMoodSlug: MoodSlug | null;
+}) {
+  const current = await getOrCreateEntry(input.user, input.entryDate);
 
   if (current.revision !== input.expectedRevision) {
     throw new EntryConflictError("El libro cambió en otra sesión.");
@@ -267,4 +293,33 @@ export async function saveTodayEntry(input: {
   });
 
   return { revision: nextRevision, primaryMood: findMood(input.primaryMoodSlug) };
+}
+
+export async function listEntryHistory(user: CurrentUser, entryDate: string) {
+  const current = await getOrCreateEntry(user, entryDate);
+  const versions = await listEntryVersions(current.entryId, user.id);
+  return versions.map((version) => {
+    const text = version.book.pages.flatMap((page) => page.elements)
+      .filter((element): element is Extract<PageElement, { type: "text" }> => element.type === "text")
+      .map((element) => element.content.text.trim()).filter(Boolean).join(" ");
+    return {
+      revision: version.revision,
+      savedAt: version.savedAt.toISOString(),
+      pageCount: version.book.pages.length,
+      excerpt: text.slice(0, 180),
+    };
+  });
+}
+
+export async function restoreEntryRevision(user: CurrentUser, entryDate: string, revision: number) {
+  const current = await getOrCreateEntry(user, entryDate);
+  const version = await findEntryVersion(current.entryId, user.id, revision);
+  if (!version) throw new Error("No encontramos esa revisión.");
+  return saveEntry({
+    user,
+    entryDate,
+    expectedRevision: current.revision,
+    book: version.book,
+    primaryMoodSlug: current.primaryMood?.slug ?? null,
+  });
 }

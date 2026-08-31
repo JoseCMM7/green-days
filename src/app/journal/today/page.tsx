@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BookEditor } from "@/components/journal/book-editor";
 import { getOrCreateTodayEntry } from "@/features/journal/service";
 import { requireUser } from "@/lib/auth/current-user";
@@ -21,6 +22,7 @@ export default async function TodayJournalPage() {
           <p className="mx-auto mt-3 max-w-2xl leading-7 text-[var(--muted)]">
             No necesitas escribir mucho. Una frase, una sensación o un pequeño detalle es suficiente.
           </p>
+          <Link href={`/capsules?entry=${entry.entryId}`} className="mt-5 inline-flex rounded-full border border-[var(--brown-light)] bg-[var(--paper)] px-5 py-2.5 text-sm font-bold">Crear cápsula de este día</Link>
         </header>
         <BookEditor
           entryId={entry.entryId}

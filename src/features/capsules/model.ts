@@ -9,6 +9,9 @@ export const capsuleInputSchema = z.object({
   paperColor: hexColor,
   revealStyle: z.enum(["letter", "box", "book"]),
   sealStickerId: z.string().trim().max(40).optional(),
+  sourceEntryId: z
+    .union([z.literal(""), z.uuid()])
+    .transform((value) => value || undefined),
 });
 
 export type CapsuleInput = z.infer<typeof capsuleInputSchema>;

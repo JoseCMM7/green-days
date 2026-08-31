@@ -31,6 +31,7 @@ export default async function CapsulePage({ params }: { params: Promise<{ id: st
           {opened ? <p className="whitespace-pre-wrap font-display max-w-3xl text-xl leading-9 text-[var(--brown-dark)] sm:text-2xl">{document.message}</p> : <div className="grid min-h-72 place-items-center text-center"><div><div className="text-7xl" aria-hidden="true">🔒</div><p className="mt-5 font-display text-3xl font-semibold">El mensaje sigue sellado</p></div></div>}
         </article>
         <div className="mt-7 flex flex-wrap justify-center gap-3">
+          {result.sourceEntryDate && <Link href={`/journal/${result.sourceEntryDate}`} className="rounded-full border border-[var(--brown-light)] bg-[var(--paper)] px-6 py-3 text-sm font-bold">Abrir entrada vinculada</Link>}
           {!opened && ready && <form action={openAction}><button className="rounded-full bg-[var(--yellow)] px-6 py-3 text-sm font-bold text-[var(--brown-dark)]">Romper el sello</button></form>}
           <form action={removeAction}><ConfirmSubmitButton message="¿Eliminar esta cápsula definitivamente?" className="rounded-full border border-[#bd7964] bg-[#f4d8c8] px-6 py-3 text-sm font-bold text-[#6f2d20]">Eliminar cápsula</ConfirmSubmitButton></form>
         </div>

@@ -7,7 +7,7 @@ import {
 } from "mongodb";
 import { resetMongoConnection } from "./client";
 import { getMongoCollections } from "./collections";
-import { entryDocumentSchema, type EntryDocument } from "./schemas";
+import { entryDocumentSchema, entryVersionSchema, type EntryDocument } from "./schemas";
 
 function isTransientConnectionError(error: unknown) {
   return (
@@ -83,4 +83,16 @@ export async function replaceEntryDocument(input: EntryDocument, expectedRevisio
   }
 
   return document;
+}
+
+export async function listEntryVersions(entryId: string, userId: string, limit = 30) {
+  const { entryVersions } = await getMongoCollections();
+  const versions = await entryVersions.find({ entryId, userId }).sort({ revision: -1 }).limit(limit).toArray();
+  return versions.map((version) => entryVersionSchema.parse(version));
+}
+
+export async function findEntryVersion(entryId: string, userId: string, revision: number) {
+  const { entryVersions } = await getMongoCollections();
+  const version = await entryVersions.findOne({ entryId, userId, revision });
+  return version ? entryVersionSchema.parse(version) : null;
 }
