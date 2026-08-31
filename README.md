@@ -33,9 +33,18 @@ La etapa 4 comenzó con el primer módulo de recuerdos conectados:
 - Calendario emocional real con navegación mensual y resumen del mes.
 - Catálogo emocional compartido instalado mediante una migración de Drizzle.
 
+La etapa 5 de preparación local también está disponible, sin despliegue:
+
+- Exportación y eliminación segura de los datos de la cuenta.
+- Encabezados de seguridad, privacidad y observabilidad.
+- Accesibilidad por teclado y recuperación global de errores.
+- Pruebas adicionales para operaciones sensibles.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
 [guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
 etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
+La preparación previa al lanzamiento está documentada en la
+[guía de la etapa 5](./docs/stage-5.md).
 
 ## Ejecutar localmente
 
