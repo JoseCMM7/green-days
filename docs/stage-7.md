@@ -34,8 +34,8 @@ capacidad de detectar regresiones automáticamente.
   su advertencia de salida.
 
 Los archivos retirados de la página se conservan de forma privada mientras
-existan versiones históricas que puedan referenciarlos. Se eliminan junto con la
-cuenta; una limpieza futura deberá comprobar primero todas las revisiones.
+existan versiones históricas que puedan referenciarlos. La etapa 8 añadió una
+limpieza que comprueba todas esas revisiones antes de eliminar un archivo.
 
 ## Pruebas
 

@@ -59,6 +59,14 @@ La etapa 7 estabiliza esa experiencia antes del lanzamiento:
 - Autoguardado tolerante a desconexiones con reintentos progresivos.
 - Pruebas E2E de escritorio y móvil mediante Playwright.
 
+La etapa 8 pule el producto y lo hace presentable sin desplegarlo:
+
+- Paso de página animado, gestos horizontales y zoom del libro entre 75 % y 150 %.
+- Preparación de fotografías en el navegador: orientación, reducción y WebP cuando conviene.
+- Cuota privada de 500 MB visible y limpieza conservadora de archivos realmente huérfanos.
+- Presentación pública del producto en `/showcase` sin exponer diarios personales.
+- Recorrido E2E autenticado opcional con una cuenta exclusiva de pruebas.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
 [guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
 etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
@@ -66,6 +74,7 @@ La preparación previa al lanzamiento está documentada en la
 [guía de la etapa 5](./docs/stage-5.md).
 El editor creativo terminado está en la [guía de la etapa 6](./docs/stage-6.md).
 La estabilización previa al lanzamiento está en la [guía de la etapa 7](./docs/stage-7.md).
+El pulido y control de almacenamiento están en la [guía de la etapa 8](./docs/stage-8.md).
 
 ## Ejecutar localmente
 

@@ -119,4 +119,24 @@ La migración de la etapa 6 crea automáticamente el bucket privado de medios y
 sus políticas. No se debe cambiar a público: la aplicación descarga cada archivo
 a través de una ruta autenticada y verifica su propietario en PostgreSQL.
 
+## Ciclo de vida del almacenamiento
+
+La etapa 8 establece una cuota inicial de 500 MB por cuenta. Antes de subir un
+archivo, el servidor suma `media_assets.byte_size` y rechaza la operación si
+superaría esa cuota. Las fotografías grandes se preparan primero en el navegador:
+se normaliza su orientación, se limita el lado mayor a 2400 píxeles y, cuando
+conviene, se convierten a WebP. PostgreSQL conserva también sus dimensiones.
+
+La limpieza manual de la cuenta es deliberadamente conservadora. Un archivo sólo
+puede borrarse si tiene más de 24 horas y no aparece en ninguno de estos lugares:
+
+- libro actual o cualquier versión histórica de una entrada;
+- cápsula del tiempo;
+- portada o decoración de un álbum;
+- sticker personalizado.
+
+Primero se eliminan los objetos privados de Storage en lotes de 100 y después sus
+metadatos relacionales. Esto evita usar el borrado de una capa como señal
+suficiente: todavía podría necesitarse al restaurar una revisión anterior.
+
 `.env.local` está ignorado por Git. Las credenciales no deben copiarse al chat ni subirse al repositorio.
