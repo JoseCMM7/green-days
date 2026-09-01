@@ -6,12 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src tests scripts drizzle.config.ts envConfig.ts next.config.ts proxy.ts",
+    "lint": "eslint src tests scripts drizzle.config.ts envConfig.ts next.config.ts playwright.config.ts proxy.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "mongo:indexes": "tsx scripts/mongodb/ensure-indexes.ts",
-    "test:models": "tsx --test tests/*.test.ts"
+    "test:models": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@next/env": "^16.3.3",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
