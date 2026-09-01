@@ -15,9 +15,9 @@ import {
   spreadCount,
   undoLastDrawingPath,
 } from "@/features/journal/book-pages";
-import type { JournalBook } from "@/features/journal/default-book";
+import { prepareBookForImmersiveEditing, type JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
-import { clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
+import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
 import { preparePhotoForUpload } from "@/features/media/photo-preparation";
 
 type BookEditorProps = {
@@ -26,6 +26,7 @@ type BookEditorProps = {
   initialRevision: number;
   initialBook: JournalBook;
   initialPrimaryMood: MoodOption | null;
+  autoOpen?: boolean;
 };
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "offline" | "error" | "conflict";
@@ -86,9 +87,10 @@ export function BookEditor({
   initialRevision,
   initialBook,
   initialPrimaryMood,
+  autoOpen = false,
 }: BookEditorProps) {
-  const [book, setBook] = useState(initialBook);
-  const [isOpen, setIsOpen] = useState(false);
+  const [book, setBook] = useState(() => prepareBookForImmersiveEditing(initialBook));
+  const [isOpen, setIsOpen] = useState(autoOpen);
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [activePageId, setActivePageId] = useState(initialBook.pages[0].id);
   const [editorTool, setEditorTool] = useState<EditorTool>("write");
@@ -578,6 +580,20 @@ export function BookEditor({
     });
   }
 
+  function moveSelectedElementToPage(targetPageId: string) {
+    if (!selectedElement || selectedElement.pageId === targetPageId) return;
+    const sourcePageId = selectedElement.pageId;
+    changeBook((draft) => moveBookElementToPage(
+      draft,
+      sourcePageId,
+      targetPageId,
+      selectedElement.elementId,
+      { x: 100, y: selectedElementData?.frame.y ?? 180 },
+    ));
+    setActivePageId(targetPageId);
+    setSelectedElement({ pageId: targetPageId, elementId: selectedElement.elementId });
+  }
+
   function duplicateSelectedElement() {
     if (!selectedElement) return;
     const nextId = crypto.randomUUID();
@@ -614,7 +630,7 @@ export function BookEditor({
   ) {
     event.preventDefault();
     event.stopPropagation();
-    if (element.frame.locked || element.type === "text" || element.type === "drawing") return;
+    if (element.frame.locked || element.type === "drawing") return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const pageElement = event.currentTarget.closest<HTMLElement>("[data-book-page]");
     if (!pageElement) return;
@@ -662,10 +678,10 @@ export function BookEditor({
     const pageElement = event.currentTarget.closest<HTMLElement>("[data-book-page]");
     if (!pageElement) return;
     const pageRect = pageElement.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const initialX = element.frame.x;
-    const initialY = element.frame.y;
+    let currentPageId = pageId;
+    let currentPageRect = pageRect;
+    const grabOffsetX = ((event.clientX - pageRect.left) / pageRect.width) * 1000 - element.frame.x;
+    const grabOffsetY = ((event.clientY - pageRect.top) / pageRect.height) * 1400 - element.frame.y;
     let recorded = false;
 
     function move(pointerEvent: PointerEvent) {
@@ -676,13 +692,27 @@ export function BookEditor({
         setCanRedo(false);
         recorded = true;
       }
-      const deltaX = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
-      const deltaY = ((pointerEvent.clientY - startY) / pageRect.height) * 1400;
+      const hoveredPage = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)
+        ?.closest<HTMLElement>("[data-book-page]");
+      const hoveredPageId = hoveredPage?.dataset.bookPageId;
+      if (hoveredPage && hoveredPageId && hoveredPageId !== currentPageId) {
+        const nextRect = hoveredPage.getBoundingClientRect();
+        const nextX = ((pointerEvent.clientX - nextRect.left) / nextRect.width) * 1000 - grabOffsetX;
+        const nextY = ((pointerEvent.clientY - nextRect.top) / nextRect.height) * 1400 - grabOffsetY;
+        changeBook((draft) => moveBookElementToPage(draft, currentPageId, hoveredPageId, element.id, { x: nextX, y: nextY }), { recordHistory: false });
+        currentPageId = hoveredPageId;
+        currentPageRect = nextRect;
+        setActivePageId(hoveredPageId);
+        setSelectedElement({ pageId: hoveredPageId, elementId: element.id });
+        return;
+      }
+      const nextX = ((pointerEvent.clientX - currentPageRect.left) / currentPageRect.width) * 1000 - grabOffsetX;
+      const nextY = ((pointerEvent.clientY - currentPageRect.top) / currentPageRect.height) * 1400 - grabOffsetY;
       changeBook((draft) => {
-        const draftElement = draft.pages.find((page) => page.id === pageId)?.elements.find((candidate) => candidate.id === element.id);
+        const draftElement = draft.pages.find((page) => page.id === currentPageId)?.elements.find((candidate) => candidate.id === element.id);
         if (!draftElement) return;
-        draftElement.frame.x = clamp(initialX + deltaX, 0, 1000 - draftElement.frame.width);
-        draftElement.frame.y = clamp(initialY + deltaY, 0, 1400 - draftElement.frame.height);
+        draftElement.frame.x = clamp(nextX, 0, 1000 - draftElement.frame.width);
+        draftElement.frame.y = clamp(nextY, 0, 1400 - draftElement.frame.height);
       }, { recordHistory: false });
     }
 
@@ -697,12 +727,15 @@ export function BookEditor({
     window.addEventListener("pointercancel", finish, { once: true });
   }
 
+  const visiblePages = pagesInSpread(book, spreadIndex);
   const selectedElementData = selectedElement
     ? book.pages
         .find((page) => page.id === selectedElement.pageId)
         ?.elements.find((element) => element.id === selectedElement.elementId)
     : null;
-  const visiblePages = pagesInSpread(book, spreadIndex);
+  const otherVisiblePage = selectedElement
+    ? visiblePages.find((page) => page.id !== selectedElement.pageId)
+    : undefined;
   const totalSpreads = spreadCount(book);
 
   const handleKeyboardShortcut = useEffectEvent((event: KeyboardEvent) => {
@@ -748,7 +781,7 @@ export function BookEditor({
 
   return (
     <div className="book-editor" data-entry-id={entryId}>
-      <div className="mb-5 flex flex-col gap-4 rounded-[1.5rem] border border-[var(--line)] bg-[rgba(249,237,209,0.86)] p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      <div className="book-status-strip mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ochre)]">
             {formatEntryDate(entryDate)}
@@ -801,7 +834,9 @@ export function BookEditor({
         </section>
       )}
 
-      <section className="mb-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-4 sm:p-5" aria-label="Herramientas del libro">
+      <details className="book-toolbox mb-5">
+        <summary><span aria-hidden="true">✒</span><strong>Abrir el estuche de escritura</strong><span className="ml-auto text-[0.68rem] font-semibold text-[var(--muted)]">emoción · dibujo · fotos · stickers</span></summary>
+      <section className="mt-3 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-4 sm:p-5" aria-label="Herramientas del libro">
         <div className="mb-5 border-b border-[var(--line)] pb-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -888,29 +923,11 @@ export function BookEditor({
             <button type="button" onClick={() => setBookZoom(1)} className="tool-pill min-w-16" aria-label="Restablecer zoom al cien por ciento">{Math.round(bookZoom * 100)}%</button>
             <button type="button" onClick={() => setBookZoom((value) => clampBookZoom(value + 0.25))} disabled={bookZoom >= 1.5} className="tool-pill disabled:opacity-40" aria-label="Acercar el libro">+</button>
             <span className="mx-1 h-7 w-px bg-[var(--line)]" />
-            <span className="mr-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
-              Pliego
-            </span>
-            {Array.from({ length: totalSpreads }, (_, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => goToSpread(index)}
-                className={`rounded-full px-4 py-2 text-xs font-bold transition ${
-                  spreadIndex === index
-                    ? "bg-[var(--yellow)] text-[var(--brown-dark)]"
-                    : "border border-[var(--brown-light)] bg-[#fff6df] text-[var(--brown)]"
-                }`}
-              >
-                {index * 2 + 1}–{index * 2 + 2}
-              </button>
-            ))}
-            <button type="button" onClick={() => goToSpread(spreadIndex - 1)} disabled={spreadIndex === 0} className="tool-pill disabled:opacity-40" aria-label="Pliego anterior">←</button>
-            <button type="button" onClick={() => goToSpread(spreadIndex + 1)} disabled={spreadIndex >= totalSpreads - 1} className="tool-pill disabled:opacity-40" aria-label="Pliego siguiente">→</button>
+            <span className="rounded-full bg-[#ead8b0] px-3 py-2 text-xs font-bold text-[var(--brown)]">Páginas {spreadIndex * 2 + 1}–{Math.min(spreadIndex * 2 + 2, book.pages.length)}</span>
             <button type="button" onClick={addSpread} disabled={!isOpen || book.pages.length >= MAX_JOURNAL_PAGES} className="tool-pill disabled:opacity-40">+ Dos páginas</button>
             {book.pages.length > 2 && <button type="button" onClick={removeLastSpread} className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]">Quitar últimas</button>}
 
-            {selectedElementData && selectedElement && selectedElementData.type !== "text" && selectedElementData.type !== "drawing" && (
+            {selectedElementData && selectedElement && selectedElementData.type !== "drawing" && (
               <>
                 <span className="mx-1 h-7 w-px bg-[var(--line)]" />
                 <button
@@ -944,6 +961,8 @@ export function BookEditor({
                 >
                   −
                 </button>
+                {selectedElementData.type === "text" && <><button type="button" onClick={() => changeBook((draft) => changeTextFontSize(draft, selectedElement.pageId, selectedElement.elementId, -6))} className="tool-pill" aria-label="Reducir tamaño de letra">A−</button><button type="button" onClick={() => changeBook((draft) => changeTextFontSize(draft, selectedElement.pageId, selectedElement.elementId, 6))} className="tool-pill" aria-label="Aumentar tamaño de letra">A+</button></>}
+                {otherVisiblePage && <button type="button" onClick={() => moveSelectedElementToPage(otherVisiblePage.id)} className="tool-pill">Mover a página {otherVisiblePage.pageNumber}</button>}
                 <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
                   const page = bookRef.current.pages.find((candidate) => candidate.id === selectedElement.pageId);
                   element.frame.zIndex = Math.max(0, ...(page?.elements.map((candidate) => candidate.frame.zIndex) ?? [0])) + 1;
@@ -965,17 +984,21 @@ export function BookEditor({
           </div>
         </div>
       </section>
+      </details>
 
       <div className="book-stage" onTouchStart={beginPageSwipe} onTouchEnd={finishPageSwipe}>
         <div
           className={`book-object ${isOpen ? "is-open" : ""}`}
           style={{ width: `min(${bookZoom * 100}%, ${74 * bookZoom}rem)` }}
         >
+          <span className="day-bookmark" aria-label={`Separador del ${formatEntryDate(entryDate)}`}>{formatEntryDate(entryDate)}</span>
           <div className={`book-pages ${turnDirection ? `is-turning-${turnDirection}` : ""}`} aria-hidden={!isOpen} aria-live="polite">
+            {turnDirection && <span className={`page-turn-leaf page-turn-leaf-${turnDirection}`} aria-hidden="true" />}
             {visiblePages.map((page) => (
               <section
                 key={page.id}
                 data-book-page
+                data-book-page-id={page.id}
                 onPointerDown={() => setActivePageId(page.id)}
                 className={`notebook-page ${page.side === "left" ? "notebook-page-left" : "notebook-page-right"} ${activePageId === page.id ? "is-active" : ""}`}
                 style={{ backgroundColor: page.backgroundColor }}
@@ -1010,24 +1033,31 @@ export function BookEditor({
                   }
 
                   if (element.type === "text") {
+                    const isSelected = selectedElement?.elementId === element.id;
+                    const pencilFont = /Segoe Print|Bradley Hand|Comic Sans|Caveat|font-pencil/i.test(element.content.fontFamily)
+                      ? 'var(--font-pencil), "Segoe Print", cursive'
+                      : element.content.fontFamily;
                     return (
-                      <textarea
-                        key={element.id}
-                        value={element.content.text}
-                        onChange={(event) => updateText(page.id, element.id, event.target.value)}
-                        onFocus={() => setActivePageId(page.id)}
-                        disabled={!isOpen}
-                        placeholder={page.side === "left" ? "Hoy quiero recordar…" : "Y también…"}
-                        className="page-writing"
-                        style={{
-                          ...frameStyle,
-                          color: element.content.color,
-                          fontFamily: element.content.fontFamily,
-                          textAlign: element.content.alignment,
-                          lineHeight: element.content.lineHeight,
-                        }}
-                        aria-label={`Texto de la página ${page.pageNumber}`}
-                      />
+                      <div key={element.id} data-editor-element className={`page-writing-frame ${isSelected ? "is-selected" : ""}`} style={frameStyle}>
+                        <textarea
+                          value={element.content.text}
+                          onChange={(event) => updateText(page.id, element.id, event.target.value)}
+                          onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }}
+                          disabled={!isOpen}
+                          placeholder={page.side === "left" ? "Hoy quiero recordar…" : "Y también…"}
+                          className="page-writing"
+                          style={{
+                            color: element.content.color,
+                            fontFamily: pencilFont,
+                            fontSize: `${element.content.fontSize / 10}cqw`,
+                            textAlign: element.content.alignment,
+                            lineHeight: element.content.lineHeight,
+                            fontWeight: element.content.weight === "normal" ? 400 : element.content.weight === "semibold" ? 600 : 700,
+                          }}
+                          aria-label={`Texto de la página ${page.pageNumber}`}
+                        />
+                        {isSelected && <button type="button" onPointerDown={(event) => handleElementPointerDown(event, page.id, element)} className="page-writing-handle" aria-label={`Mover texto de la página ${page.pageNumber}`} title="Arrastra para mover el texto">✥</button>}
+                      </div>
                     );
                   }
 
@@ -1082,7 +1112,7 @@ export function BookEditor({
                   return null;
                 })}
                 {selectedElement && selectedElement.pageId === page.id && selectedElementData
-                  && selectedElementData.type !== "text" && selectedElementData.type !== "drawing"
+                  && selectedElementData.type !== "drawing"
                   && !selectedElementData.frame.locked && editorTool === "write" && (
                     <button
                       type="button"
@@ -1117,6 +1147,11 @@ export function BookEditor({
             ))}
           </div>
 
+          {isOpen && <>
+            <button type="button" onClick={() => goToSpread(spreadIndex - 1)} disabled={spreadIndex === 0} className="book-page-turn book-page-turn-previous" aria-label="Hojear hacia las páginas anteriores"><span aria-hidden="true">‹</span><small>Páginas anteriores</small></button>
+            <button type="button" onClick={() => goToSpread(spreadIndex + 1)} disabled={spreadIndex >= totalSpreads - 1} className="book-page-turn book-page-turn-next" aria-label="Hojear hacia las páginas siguientes"><span aria-hidden="true">›</span><small>Páginas siguientes</small></button>
+          </>}
+
           <button
             type="button"
             className="book-cover"
@@ -1126,7 +1161,7 @@ export function BookEditor({
             aria-hidden={isOpen}
             tabIndex={isOpen ? -1 : 0}
           >
-            <span className="book-cover-spine" style={{ background: book.spine.color }} />
+            <span className="book-cover-spine" style={{ backgroundColor: book.spine.color }} />
             <span className="book-cover-border">
               <span className="book-cover-kicker">Green Days</span>
               <strong>Mi día</strong>
@@ -1136,6 +1171,7 @@ export function BookEditor({
             </span>
           </button>
         </div>
+        {isOpen && <div className="mobile-book-turns" aria-label="Controles para hojear en móvil"><button type="button" onClick={() => goToSpread(spreadIndex - 1)} disabled={spreadIndex === 0} aria-label="Páginas anteriores">‹</button><span>Páginas {spreadIndex * 2 + 1}–{Math.min(spreadIndex * 2 + 2, book.pages.length)}</span><button type="button" onClick={() => goToSpread(spreadIndex + 1)} disabled={spreadIndex >= totalSpreads - 1} aria-label="Páginas siguientes">›</button></div>}
       </div>
 
       {isOpen && (

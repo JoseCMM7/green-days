@@ -97,35 +97,31 @@ export function EmotionalCalendar({ initialData }: { initialData: CalendarMonthD
             const entry = entriesByDate.get(cell.date);
             const isToday = cell.date === data.today;
             const isSelected = cell.date === selectedDate;
+            const isFuture = cell.date > data.today;
+            const dayContent = <>
+              {entry?.mood && (
+                <span
+                  className="absolute inset-1.5 rounded-xl opacity-35"
+                  style={{ backgroundColor: entry.mood.color }}
+                  aria-hidden="true"
+                />
+              )}
+              <span className="relative z-10">{cell.day}</span>
+              {entry && (
+                <span className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 text-[0.7rem]" aria-hidden="true">
+                  {entry.mood?.icon ?? "•"}
+                </span>
+              )}
+              {!isFuture && <span className="calendar-ribbon" aria-hidden="true" />}
+            </>;
+            const dayClass = `calendar-day relative grid aspect-square place-items-center rounded-2xl border text-sm font-semibold transition ${
+              isSelected
+                ? "border-[var(--brown)] bg-[#fff5d9] shadow-sm"
+                : "border-transparent hover:border-[var(--line)] hover:bg-[#fff5d9]"
+            } ${isToday ? "ring-2 ring-[var(--yellow)] ring-offset-2 ring-offset-[var(--paper)]" : ""}`;
 
-            return (
-              <button
-                key={cell.key}
-                type="button"
-                onClick={() => setSelectedDate(cell.date)}
-                aria-pressed={isSelected}
-                aria-label={`${formatDay(cell.date)}${entry ? `, ${entry.mood?.name ?? "con entrada"}` : ", sin entrada"}${isToday ? ", hoy" : ""}`}
-                className={`relative aspect-square rounded-2xl border text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-sm ${
-                  isSelected
-                    ? "border-[var(--brown)] bg-[#fff5d9] shadow-sm"
-                    : "border-transparent hover:border-[var(--line)] hover:bg-[#fff5d9]"
-                } ${isToday ? "ring-2 ring-[var(--yellow)] ring-offset-2 ring-offset-[var(--paper)]" : ""}`}
-              >
-                {entry?.mood && (
-                  <span
-                    className="absolute inset-1.5 rounded-xl opacity-35"
-                    style={{ backgroundColor: entry.mood.color }}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className="relative z-10">{cell.day}</span>
-                {entry && (
-                  <span className="absolute bottom-1 left-1/2 z-10 -translate-x-1/2 text-[0.7rem]" aria-hidden="true">
-                    {entry.mood?.icon ?? "•"}
-                  </span>
-                )}
-              </button>
-            );
+            if (isFuture) return <span key={cell.key} aria-label={`${formatDay(cell.date)}, todavía no ha ocurrido`} className={`${dayClass} cursor-not-allowed opacity-35`}>{dayContent}</span>;
+            return <Link key={cell.key} href={`/journal/${cell.date}?open=1`} aria-current={isSelected ? "date" : undefined} aria-label={`${formatDay(cell.date)}${entry ? `, ${entry.mood?.name ?? "con entrada"}` : ", sin entrada"}${isToday ? ", hoy" : ""}. Abrir por este separador.`} className={dayClass}>{dayContent}</Link>;
           })}
         </div>
 
@@ -169,8 +165,8 @@ export function EmotionalCalendar({ initialData }: { initialData: CalendarMonthD
             ) : (
               <p className="mt-2 text-sm text-[var(--muted)]">Todavía no hay una entrada guardada en este día.</p>
             )}
-            <Link href={`/journal/${selectedDate}`} className="mt-4 inline-flex rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold text-[var(--brown-dark)]">
-              {selectedEntry ? "Abrir este libro" : "Escribir en este día"}
+            <Link href={`/journal/${selectedDate}?open=1`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold text-[var(--brown-dark)]">
+              <span aria-hidden="true">🔖</span>{selectedEntry ? "Abrir por este separador" : "Colocar separador y escribir"}
             </Link>
           </div>
         )}

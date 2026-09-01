@@ -11,10 +11,10 @@ function defaultTextElement(template?: JournalPage): PageElement {
   return {
     id: crypto.randomUUID(),
     type: "text",
-    frame: source?.frame ? { ...source.frame } : { x: 80, y: 120, width: 840, height: 1120, rotation: 0, zIndex: 1, locked: true },
+    frame: source?.frame ? { ...source.frame, locked: false } : { x: 80, y: 120, width: 840, height: 1120, rotation: 0, zIndex: 1, locked: false },
     content: source?.type === "text"
       ? { ...source.content, text: "" }
-      : { text: "", fontFamily: '"Segoe Print", "Bradley Hand", cursive', fontSize: 42, color: "#503722", alignment: "left", lineHeight: 1.45, weight: "normal" },
+      : { text: "", fontFamily: 'var(--font-pencil), "Segoe Print", "Bradley Hand", cursive', fontSize: 42, color: "#503722", alignment: "left", lineHeight: 1.45, weight: "normal" },
   };
 }
 

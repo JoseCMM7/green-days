@@ -38,7 +38,7 @@ export const personalizationInputSchema = z.object({
 
 const fontFamilies: Record<ThemeTokens["displayFont"], string> = {
   classic: 'Georgia, "Times New Roman", serif',
-  friendly: '"Segoe Print", "Bradley Hand", cursive',
+  friendly: 'var(--font-pencil), "Segoe Print", "Bradley Hand", cursive',
   elegant: 'Garamond, Georgia, serif',
 };
 

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { pageElementSchema } from "../src/db/mongodb/schemas";
-import { createDefaultBook } from "../src/features/journal/default-book";
+import { createDefaultBook, prepareBookForImmersiveEditing } from "../src/features/journal/default-book";
 import type { JournalBook } from "../src/features/journal/default-book";
-import { clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, mediaIdsInElements, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "../src/features/journal/editor-operations";
+import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, mediaIdsInElements, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "../src/features/journal/editor-operations";
 
 function bookWithPhoto() {
   const book = createDefaultBook();
@@ -23,6 +23,19 @@ test("duplica una capa sin sacarla de la página", () => {
   assert.equal(duplicate?.frame.y, 1245);
   assert.equal(duplicate?.frame.locked, false);
   assert.equal(mediaIdsInBook(book).size, 1, "las copias comparten el mismo archivo privado");
+});
+
+test("actualiza la zona de escritura antigua sin alterar el original", () => {
+  const book = createDefaultBook();
+  const writing = book.pages[0].elements[0];
+  if (writing.type !== "text") assert.fail("se esperaba texto");
+  writing.frame.locked = true;
+  writing.content.fontFamily = '"Segoe Print", cursive';
+  const prepared = prepareBookForImmersiveEditing(book);
+  const preparedWriting = prepared.pages[0].elements[0];
+  assert.equal(preparedWriting.frame.locked, false);
+  assert.match(preparedWriting.type === "text" ? preparedWriting.content.fontFamily : "", /font-pencil/);
+  assert.equal(writing.frame.locked, true);
 });
 
 test("las referencias de medios incluyen stickers personalizados", () => {
@@ -49,6 +62,22 @@ test("mueve, redimensiona y recorta respetando los límites", () => {
   assert.equal(cropPhoto(book, page.id, photo.id, 0.8, -0.8), true);
   assert.equal(photo.type === "photo" && photo.content.cropX, 1);
   assert.equal(photo.type === "photo" && photo.content.cropY, 0);
+});
+
+test("mueve una capa entre páginas y permite ajustar la escritura", () => {
+  const book = bookWithPhoto();
+  const source = book.pages[0];
+  const target = book.pages[1];
+  const photo = source.elements[1];
+  const moved = moveBookElementToPage(book, source.id, target.id, photo.id, { x: 300, y: 220 });
+  assert.equal(source.elements.some((element) => element.id === photo.id), false);
+  assert.equal(target.elements.some((element) => element.id === photo.id), true);
+  assert.equal(moved?.frame.x, 300);
+  const writing = target.elements.find((element) => element.type === "text")!;
+  writing.frame.locked = false;
+  assert.equal(resizeBookElement(book, target.id, writing.id, 640), true);
+  assert.equal(changeTextFontSize(book, target.id, writing.id, 8), true);
+  assert.equal(writing.type === "text" && writing.content.fontSize, 50);
 });
 
 test("el historial local conserva como máximo cincuenta estados independientes", () => {

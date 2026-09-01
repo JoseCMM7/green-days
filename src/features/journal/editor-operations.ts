@@ -38,7 +38,7 @@ export function mediaIdsInBook(book: JournalBook) {
 export function duplicateBookElement(book: JournalBook, pageId: string, elementId: string, nextId: string) {
   const page = book.pages.find((candidate) => candidate.id === pageId);
   const source = page?.elements.find((element) => element.id === elementId);
-  if (!page || !source || source.type === "text" || source.type === "drawing") return null;
+  if (!page || !source || source.type === "drawing") return null;
 
   const duplicate: PageElement = structuredClone(source);
   duplicate.id = nextId;
@@ -58,14 +58,41 @@ export function nudgeBookElement(book: JournalBook, pageId: string, elementId: s
   return true;
 }
 
+export function moveBookElementToPage(
+  book: JournalBook,
+  fromPageId: string,
+  toPageId: string,
+  elementId: string,
+  position?: { x: number; y: number },
+) {
+  const sourcePage = book.pages.find((page) => page.id === fromPageId);
+  const targetPage = book.pages.find((page) => page.id === toPageId);
+  const elementIndex = sourcePage?.elements.findIndex((element) => element.id === elementId) ?? -1;
+  if (!sourcePage || !targetPage || elementIndex < 0 || fromPageId === toPageId) return null;
+  const [element] = sourcePage.elements.splice(elementIndex, 1);
+  element.frame.x = clamp(position?.x ?? element.frame.x, 0, 1000 - element.frame.width);
+  element.frame.y = clamp(position?.y ?? element.frame.y, 0, 1400 - element.frame.height);
+  element.frame.zIndex = Math.max(0, ...targetPage.elements.map((candidate) => candidate.frame.zIndex)) + 1;
+  targetPage.elements.push(element);
+  return element;
+}
+
+export function changeTextFontSize(book: JournalBook, pageId: string, elementId: string, delta: number) {
+  const element = book.pages.find((page) => page.id === pageId)?.elements.find((candidate) => candidate.id === elementId);
+  if (element?.type !== "text") return false;
+  element.content.fontSize = clamp(element.content.fontSize + delta, 8, 160);
+  return true;
+}
+
 export function resizeBookElement(book: JournalBook, pageId: string, elementId: string, width: number) {
   const element = book.pages.find((page) => page.id === pageId)?.elements.find((candidate) => candidate.id === elementId);
-  if (!element || element.frame.locked || element.type === "text" || element.type === "drawing") return false;
+  if (!element || element.frame.locked || element.type === "drawing") return false;
   const ratio = element.frame.height / element.frame.width;
-  const maxWidth = Math.min(900, 1000 - element.frame.x, (1400 - element.frame.y) / ratio);
-  const nextWidth = clamp(width, 90, Math.max(90, maxWidth));
+  const minimumWidth = element.type === "text" ? 180 : 90;
+  const maxWidth = Math.min(920, 1000 - element.frame.x, (1400 - element.frame.y) / ratio);
+  const nextWidth = clamp(width, minimumWidth, Math.max(minimumWidth, maxWidth));
   element.frame.width = nextWidth;
-  element.frame.height = clamp(nextWidth * ratio, 80, 1100);
+  element.frame.height = clamp(nextWidth * ratio, element.type === "text" ? 160 : 80, 1260);
   return true;
 }
 

@@ -93,18 +93,98 @@ a {
   background: linear-gradient(145deg, rgba(255, 234, 176, 0.34), transparent 50%), #e2c985;
 }
 
+.calendar-day {
+  isolation: isolate;
+}
+
+.calendar-day:hover {
+  transform: translateY(-0.16rem) rotate(-0.5deg);
+  box-shadow: 0 0.45rem 0.9rem rgba(77, 47, 23, 0.12);
+}
+
+.calendar-ribbon {
+  position: absolute;
+  z-index: -1;
+  top: -0.14rem;
+  right: 12%;
+  width: 22%;
+  height: 32%;
+  border-radius: 0 0 0.18rem 0.18rem;
+  background: linear-gradient(#a9462f, #7f2f21);
+  opacity: 0;
+  transform: translateY(-45%);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.calendar-day:hover .calendar-ribbon,
+.calendar-day:focus-visible .calendar-ribbon {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.diary-room {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 231, 168, 0.52), transparent 34rem),
+    linear-gradient(rgba(239, 224, 189, 0.73), rgba(222, 197, 151, 0.82)),
+    repeating-linear-gradient(93deg, rgba(95, 62, 31, 0.045) 0 1px, transparent 1px 7px);
+}
+
 .book-editor {
-  --book-shadow: rgba(71, 43, 22, 0.3);
+  --book-shadow: rgba(38, 20, 9, 0.48);
   max-width: 82rem;
   margin-inline: auto;
 }
 
+.book-status-strip {
+  margin-inline: auto;
+  max-width: 68rem;
+  border-block: 1px solid color-mix(in srgb, var(--brown-light) 60%, transparent);
+  padding: 0.75rem 1rem;
+}
+
+.book-toolbox {
+  margin-inline: auto;
+  max-width: 74rem;
+}
+
+.book-toolbox > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: fit-content;
+  margin-inline: auto;
+  border: 1px solid var(--brown-light);
+  border-radius: 999px;
+  background: rgba(239, 222, 183, 0.9);
+  padding: 0.65rem 1rem;
+  color: var(--brown);
+  cursor: pointer;
+  box-shadow: 0 0.5rem 1.4rem rgba(75, 44, 20, 0.1);
+  list-style: none;
+}
+
+.book-toolbox > summary::-webkit-details-marker {
+  display: none;
+}
+
+.book-toolbox[open] > summary {
+  background: var(--yellow-soft);
+}
+
 .book-stage {
-  perspective: 2200px;
-  padding: clamp(0.5rem, 2.5vw, 2rem);
+  position: relative;
+  perspective: 2400px;
+  padding: clamp(2.2rem, 5vw, 5rem) clamp(1rem, 4vw, 4rem) clamp(4rem, 7vw, 7rem);
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: var(--brown-light) transparent;
+  border-radius: clamp(1.5rem, 4vw, 3.5rem);
+  background:
+    radial-gradient(ellipse at 50% 86%, rgba(39, 21, 10, 0.28), transparent 47%),
+    radial-gradient(circle at 50% 0%, rgba(255, 229, 155, 0.34), transparent 54%),
+    linear-gradient(145deg, rgba(107, 75, 42, 0.1), rgba(74, 44, 22, 0.18));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.32), inset 0 -2rem 5rem rgba(67, 39, 18, 0.08);
 }
 
 .book-object {
@@ -113,18 +193,47 @@ a {
   aspect-ratio: 10 / 7;
   margin-inline: auto;
   transform-style: preserve-3d;
-  filter: drop-shadow(0 30px 28px var(--book-shadow));
+  transform: rotateX(3.5deg) translateZ(0);
+  filter: drop-shadow(0 2.7rem 2.2rem var(--book-shadow));
+}
+
+.book-object::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 2.8% 0.5% -2.7% 0.5%;
+  border-radius: 2% 3.2% 3.2% 2%;
+  background:
+    repeating-linear-gradient(to bottom, #d6bd87 0 1px, #f1deb4 1px 3px, #b99a65 3px 4px),
+    #d8bd88;
+  box-shadow: 0 1.5rem 2rem rgba(48, 27, 12, 0.36);
+  transform: translateZ(-1.1rem);
+}
+
+.book-object::after {
+  content: "";
+  position: absolute;
+  z-index: 58;
+  top: 2%;
+  bottom: 0;
+  left: 50%;
+  width: 2.3%;
+  transform: translateX(-50%) translateZ(0.55rem);
+  background: linear-gradient(90deg, transparent, rgba(45, 24, 10, 0.34) 45%, rgba(255, 241, 205, 0.18) 55%, transparent);
+  filter: blur(0.12rem);
+  pointer-events: none;
 }
 
 .book-pages {
   position: absolute;
-  inset: 1.6% 1.3%;
+  inset: 1.8% 1.15% 1.2%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: hidden;
-  border-radius: 1.4% 2.7% 2.7% 1.4%;
-  background: #6f4625;
-  box-shadow: 0 0 0 0.45rem #764b28, inset 0 0 2rem rgba(75, 44, 20, 0.26);
+  border-radius: 1.7% 2.9% 2.9% 1.7%;
+  background: #45230f;
+  box-shadow: 0 0 0 0.58rem #4a2511, inset 0 0 2.5rem rgba(45, 23, 9, 0.48);
+  transform-style: preserve-3d;
 }
 
 .notebook-page {
@@ -133,6 +242,8 @@ a {
   overflow: hidden;
   container-type: inline-size;
   background-image:
+    linear-gradient(102deg, rgba(255,255,255,.2), transparent 18%, transparent 82%, rgba(85,51,24,.1)),
+    radial-gradient(circle at 18% 22%, rgba(103, 69, 38, 0.055) 0 0.06rem, transparent 0.08rem),
     linear-gradient(90deg, transparent 10%, rgba(184, 92, 67, 0.28) 10.2%, transparent 10.4%),
     repeating-linear-gradient(
       to bottom,
@@ -141,7 +252,8 @@ a {
       rgba(126, 151, 149, 0.22) calc(3.14% - 1px),
       rgba(126, 151, 149, 0.22) 3.14%
     );
-  box-shadow: inset 0 0 2rem rgba(119, 83, 43, 0.12);
+  background-size: auto, 0.75rem 0.75rem, auto, auto;
+  box-shadow: inset 0 0 2.4rem rgba(90, 57, 25, 0.15), inset 0 -0.35rem 0.6rem rgba(81, 48, 20, 0.1);
   transition: box-shadow 180ms ease;
 }
 
@@ -151,13 +263,13 @@ a {
 
 .notebook-page-left {
   border-radius: 1.1rem 0.15rem 0.15rem 1.1rem;
-  transform: rotateY(1.6deg);
+  transform: rotateY(2.4deg) translateZ(0.12rem);
   transform-origin: right center;
 }
 
 .notebook-page-right {
   border-radius: 0.15rem 1.1rem 1.1rem 0.15rem;
-  transform: rotateY(-1.6deg);
+  transform: rotateY(-2.4deg) translateZ(0.12rem);
   transform-origin: left center;
 }
 
@@ -170,13 +282,52 @@ a {
 }
 
 @keyframes page-arrive-next {
-  from { opacity: 0.3; transform: rotateY(-38deg); }
-  to { opacity: 1; transform: rotateY(-1.6deg); }
+  from { opacity: 0.4; transform: rotateY(-44deg) translateZ(1.2rem); filter: brightness(.82); }
+  to { opacity: 1; transform: rotateY(-2.4deg) translateZ(.12rem); filter: brightness(1); }
 }
 
 @keyframes page-arrive-previous {
-  from { opacity: 0.3; transform: rotateY(38deg); }
-  to { opacity: 1; transform: rotateY(1.6deg); }
+  from { opacity: 0.4; transform: rotateY(44deg) translateZ(1.2rem); filter: brightness(.82); }
+  to { opacity: 1; transform: rotateY(2.4deg) translateZ(.12rem); filter: brightness(1); }
+}
+
+.page-turn-leaf {
+  position: absolute;
+  z-index: 55;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(86, 53, 24, 0.24), transparent 14%, rgba(255, 250, 224, 0.38) 70%, rgba(91, 54, 23, 0.16)),
+    #f4e6c5;
+  box-shadow: 0 0 1.8rem rgba(52, 29, 12, 0.28);
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.page-turn-leaf-next {
+  right: 0;
+  transform-origin: left center;
+  animation: turn-leaf-next 420ms ease-in-out both;
+}
+
+.page-turn-leaf-previous {
+  left: 0;
+  transform-origin: right center;
+  animation: turn-leaf-previous 420ms ease-in-out both;
+}
+
+@keyframes turn-leaf-next {
+  0% { transform: rotateY(0deg); }
+  55% { box-shadow: -1.6rem 0 2rem rgba(48, 27, 12, .3); }
+  100% { transform: rotateY(-178deg); }
+}
+
+@keyframes turn-leaf-previous {
+  0% { transform: rotateY(0deg); }
+  55% { box-shadow: 1.6rem 0 2rem rgba(48, 27, 12, .3); }
+  100% { transform: rotateY(178deg); }
 }
 
 .notebook-page-left::after,
@@ -211,17 +362,50 @@ a {
   font-size: clamp(0.55rem, 1.2vw, 0.8rem);
 }
 
+.page-writing-frame {
+  position: absolute;
+  min-width: 0;
+}
+
+.page-writing-frame.is-selected {
+  outline: 0.12rem dashed rgba(128, 87, 53, 0.52);
+  outline-offset: 0.18rem;
+}
+
 .page-writing {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   resize: none;
   overflow: hidden;
   border: 0;
   outline: 0;
   background: transparent;
-  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-  font-size: clamp(0.64rem, 2.2cqw, 1.65rem);
-  letter-spacing: 0.015em;
+  font-family: var(--font-pencil), "Segoe Print", "Bradley Hand", cursive;
+  font-size: clamp(0.72rem, 4.2cqw, 2.45rem);
+  letter-spacing: 0.012em;
+  text-shadow: 0.02em 0.025em rgba(76, 54, 37, 0.18);
   caret-color: var(--ochre);
+}
+
+.page-writing-handle {
+  position: absolute;
+  z-index: 5;
+  top: -1.2rem;
+  left: 50%;
+  display: grid;
+  width: 2rem;
+  height: 1.55rem;
+  transform: translateX(-50%);
+  place-items: center;
+  border: 1px solid rgba(102, 68, 36, 0.45);
+  border-radius: 999px;
+  background: #efe0bd;
+  color: var(--brown);
+  cursor: grab;
+  box-shadow: 0 0.25rem 0.5rem rgba(56, 31, 13, 0.16);
+  touch-action: none;
 }
 
 .page-writing::placeholder {
@@ -262,14 +446,18 @@ a {
   border: 0;
   border-radius: 2.8% 4.2% 4.2% 2.8%;
   background:
-    linear-gradient(100deg, rgba(255, 255, 255, 0.08), transparent 18%, rgba(44, 24, 11, 0.12)),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, rgba(38, 20, 8, 0.025) 1px 3px),
+    linear-gradient(102deg, rgba(255, 217, 141, 0.16), transparent 16%, rgba(20, 8, 2, 0.22) 82%),
+    radial-gradient(ellipse at 58% 35%, transparent 0 35%, rgba(31, 13, 4, 0.24) 100%),
+    url("/textures/aged-leather-cover.jpg"),
     #95602e;
+  background-size: auto, auto, cover, auto;
+  background-blend-mode: soft-light, multiply, multiply, normal;
   box-shadow:
-    inset 0 0 0 0.45rem rgba(69, 40, 20, 0.32),
-    inset 0 0 3.5rem rgba(49, 26, 10, 0.3),
-    0 1rem 0 #5f3a1d,
-    0 2.5rem 4rem rgba(62, 38, 20, 0.32);
+    inset 0 0 0 0.38rem rgba(42, 20, 7, 0.58),
+    inset 0 0 0 0.62rem rgba(222, 171, 91, 0.16),
+    inset 0 0 4.5rem rgba(31, 13, 4, 0.5),
+    0 1.15rem 0 #43200d,
+    0 2.8rem 4.5rem rgba(43, 22, 9, 0.48);
   color: #f7e7bb;
   cursor: pointer;
   transform: rotateY(0deg);
@@ -280,8 +468,8 @@ a {
 }
 
 .book-object.is-open .book-cover {
-  transform: rotateY(-168deg);
-  opacity: 0.18;
+  transform: rotateY(-174deg) translateZ(0.5rem);
+  opacity: 0.13;
   pointer-events: none;
 }
 
@@ -289,9 +477,12 @@ a {
   position: absolute;
   inset-block: 0;
   left: 0;
-  width: 5.4%;
-  background: linear-gradient(90deg, #4f2d16, #77451e 48%, #4d2a14);
-  box-shadow: inset -0.15rem 0 0.4rem rgba(255, 227, 169, 0.13);
+  width: 6.2%;
+  background:
+    linear-gradient(90deg, #291207, rgba(122, 65, 25, .7) 48%, #2b1409),
+    url("/textures/aged-leather-cover.jpg");
+  background-size: auto, 22rem;
+  box-shadow: inset -0.2rem 0 0.55rem rgba(255, 213, 133, 0.16), 0.25rem 0 0.8rem rgba(27, 12, 4, 0.45);
 }
 
 .book-cover-border {
@@ -301,10 +492,91 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: clamp(1px, 0.2vw, 3px) solid rgba(248, 225, 172, 0.62);
+  border: clamp(2px, 0.26vw, 4px) double rgba(211, 164, 83, 0.72);
   border-radius: 1.4rem;
-  box-shadow: inset 0 0 0 0.5rem rgba(89, 49, 22, 0.12);
+  box-shadow: inset 0 0 0 0.5rem rgba(35, 16, 5, 0.24), 0 0 0 0.18rem rgba(47, 22, 7, 0.28), inset 0 0 2rem rgba(255, 207, 116, 0.05);
+  text-shadow: 0 0.12rem 0.1rem rgba(21, 10, 3, 0.7);
 }
+
+.day-bookmark {
+  position: absolute;
+  z-index: 57;
+  top: -1.15rem;
+  left: 50%;
+  max-width: 58%;
+  transform: translateX(-50%) translateZ(0.65rem);
+  border-radius: 0.25rem 0.25rem 0.7rem 0.7rem;
+  background: linear-gradient(#b55036, #843120);
+  padding: 0.55rem 1.2rem 0.8rem;
+  color: #f8e8c7;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.55rem, 1.3vw, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-align: center;
+  text-transform: uppercase;
+  box-shadow: 0 0.45rem 0.6rem rgba(51, 24, 10, 0.28), inset 0 1px rgba(255,255,255,.2);
+}
+
+.book-page-turn {
+  position: absolute;
+  z-index: 70;
+  top: 12%;
+  bottom: 8%;
+  width: 8%;
+  border: 0;
+  background: transparent;
+  color: rgba(83, 50, 24, 0.72);
+  cursor: pointer;
+}
+
+.book-page-turn::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 80%;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, transparent 47%, rgba(116, 76, 38, 0.22) 49%, rgba(255, 246, 216, 0.82) 52%);
+  filter: drop-shadow(0 0.25rem 0.25rem rgba(50, 27, 11, 0.18));
+  transition: transform 180ms ease;
+}
+
+.book-page-turn:hover::after,
+.book-page-turn:focus-visible::after {
+  transform: scale(1.16) rotate(-2deg);
+}
+
+.book-page-turn > span {
+  position: absolute;
+  top: 46%;
+  font-family: Georgia, serif;
+  font-size: clamp(1.5rem, 4vw, 3.2rem);
+}
+
+.book-page-turn small {
+  position: absolute;
+  top: 55%;
+  width: max-content;
+  max-width: 8rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.book-page-turn:hover small,
+.book-page-turn:focus-visible small { opacity: 1; }
+.book-page-turn:disabled { opacity: 0; pointer-events: none; }
+.book-page-turn-previous { left: 0.7%; }
+.book-page-turn-previous::after { left: 0; transform: scaleX(-1); }
+.book-page-turn-previous > span { left: 4%; }
+.book-page-turn-previous small { left: 0; }
+.book-page-turn-next { right: 0.7%; }
+.book-page-turn-next::after { right: 0; }
+.book-page-turn-next > span { right: 4%; }
+.book-page-turn-next small { right: 0; text-align: right; }
+
+.mobile-book-turns { display: none; }
 
 .book-cover-kicker,
 .book-cover-date,
@@ -346,9 +618,12 @@ a {
 
 @media (max-width: 640px) {
   .book-stage {
-    margin-inline: -0.4rem;
-    padding-inline: 0;
+    margin-inline: -0.75rem;
+    padding: 2.8rem 0.25rem 4rem;
+    border-radius: 1.4rem;
   }
+
+  .book-object { min-width: 38rem; }
 
   .book-pages {
     box-shadow: 0 0 0 0.24rem #764b28, inset 0 0 1rem rgba(75, 44, 20, 0.26);
@@ -361,6 +636,54 @@ a {
       0 0.45rem 0 #5f3a1d,
       0 1.2rem 2rem rgba(62, 38, 20, 0.28);
   }
+
+  .book-toolbox > summary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .book-toolbox > summary .ml-auto { display: none; }
+
+  .day-bookmark { top: -0.9rem; }
+
+  .book-page-turn { width: 10%; }
+
+  .mobile-book-turns {
+    position: sticky;
+    z-index: 80;
+    bottom: 0.8rem;
+    left: 0.75rem;
+    display: flex;
+    width: calc(100vw - 2rem);
+    max-width: 22rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: -2.5rem;
+    border: 1px solid rgba(92, 54, 24, 0.46);
+    border-radius: 999px;
+    background: rgba(82, 45, 21, 0.9);
+    padding: 0.38rem;
+    color: #f4e2bb;
+    font-size: 0.68rem;
+    font-weight: 800;
+    box-shadow: 0 0.75rem 1.8rem rgba(44, 23, 9, 0.32);
+    backdrop-filter: blur(0.7rem);
+  }
+
+  .mobile-book-turns button {
+    display: grid;
+    width: 2.6rem;
+    height: 2.6rem;
+    place-items: center;
+    border: 1px solid rgba(244, 226, 187, 0.38);
+    border-radius: 50%;
+    background: rgba(244, 226, 187, 0.13);
+    color: inherit;
+    font-family: Georgia, serif;
+    font-size: 1.7rem;
+  }
+
+  .mobile-book-turns button:disabled { opacity: 0.25; }
 }
 
 ::selection {

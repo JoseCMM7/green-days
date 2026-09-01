@@ -13,7 +13,7 @@ type BookAppearance = {
 
 const writingFonts = {
   classic: 'Georgia, "Times New Roman", serif',
-  friendly: '"Segoe Print", "Bradley Hand", cursive',
+  friendly: 'var(--font-pencil), "Segoe Print", "Bradley Hand", cursive',
   elegant: 'Garamond, Georgia, serif',
 };
 
@@ -22,8 +22,8 @@ export function createDefaultBook(appearance: BookAppearance = {}): JournalBook 
     title: "Mi día",
     cover: {
       color: appearance.coverColor ?? "#9a642f",
-      material: "cloth",
-      textureId: "linen-warm",
+      material: "leather",
+      textureId: "aged-cognac",
       titleColor: appearance.titleColor ?? "#f8e9bd",
     },
     spine: {
@@ -47,7 +47,7 @@ export function createDefaultBook(appearance: BookAppearance = {}): JournalBook 
               height: 1120,
               rotation: 0,
               zIndex: 1,
-              locked: true,
+              locked: false,
             },
             content: {
               text: "",
@@ -93,4 +93,22 @@ export function createDefaultBook(appearance: BookAppearance = {}): JournalBook 
       },
     ],
   });
+}
+
+export function prepareBookForImmersiveEditing(book: JournalBook) {
+  const prepared = structuredClone(book);
+  for (const page of prepared.pages) {
+    for (const element of page.elements) {
+      if (element.type !== "text") continue;
+      const usedLegacyHandwriting = /Segoe Print|Bradley Hand|Comic Sans|Caveat/i.test(element.content.fontFamily);
+      const isLegacyWritingArea = element.frame.locked
+        && element.frame.x === 80
+        && element.frame.y === 120
+        && element.frame.width === 840
+        && element.frame.height === 1120;
+      if (usedLegacyHandwriting) element.content.fontFamily = writingFonts.friendly;
+      if (isLegacyWritingArea) element.frame.locked = false;
+    }
+  }
+  return prepared;
 }

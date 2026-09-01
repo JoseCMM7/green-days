@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { CSSProperties } from "react";
-import { Geist } from "next/font/google";
+import { Caveat, Geist } from "next/font/google";
 import { TopNavigation } from "@/components/top-navigation";
 import { getPersonalization } from "@/features/personalization/service";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -8,6 +8,11 @@ import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const pencilWriting = Caveat({
+  variable: "--font-pencil",
   subsets: ["latin"],
 });
 
@@ -32,7 +37,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="es"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${pencilWriting.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <a href="#main-content" className="skip-link">Saltar al contenido</a>

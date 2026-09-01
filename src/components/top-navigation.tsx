@@ -34,7 +34,7 @@ function NavIcon({ name }: { name: IconName }) {
 export function TopNavigation() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/auth")) {
+  if (pathname.startsWith("/auth") || pathname.startsWith("/journal/")) {
     return null;
   }
 
