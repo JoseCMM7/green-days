@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import type { PageElement } from "@/db/mongodb/schemas";
 import { moodCatalog, type MoodOption, type MoodSlug } from "@/features/calendar/moods";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/features/journal/book-pages";
 import type { JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
+import { cropPhoto, duplicateBookElement, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
 
 type BookEditorProps = {
   entryId: string;
@@ -26,7 +27,7 @@ type BookEditorProps = {
   initialPrimaryMood: MoodOption | null;
 };
 
-type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "conflict";
+type SaveStatus = "saved" | "unsaved" | "saving" | "offline" | "error" | "conflict";
 type DrawingElement = Extract<PageElement, { type: "drawing" }>;
 type DrawingPoint = DrawingElement["content"]["paths"][number][number];
 type EditorTool = "write" | "draw";
@@ -56,6 +57,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
     saved: "Guardado",
     unsaved: "Cambios pendientes",
     saving: "Guardando…",
+    offline: "Sin conexión · pendiente",
     error: "No se pudo guardar",
     conflict: "Hay una versión más reciente",
   };
@@ -66,7 +68,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
       className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${
         status === "saved"
           ? "bg-[#dbe3bd] text-[#4e5a3c]"
-          : status === "error" || status === "conflict"
+          : status === "error" || status === "conflict" || status === "offline"
             ? "bg-[#f2cbb8] text-[#843a28]"
             : "bg-[var(--yellow-soft)] text-[var(--brown-dark)]"
       }`}
@@ -102,6 +104,9 @@ export function BookEditor({
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "error" | "restoring">("idle");
   const [status, setStatus] = useState<SaveStatus>("saved");
+  const [isOnline, setIsOnline] = useState(true);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const [revision, setRevision] = useState(initialRevision);
   const [primaryMoodSlug, setPrimaryMoodSlug] = useState<MoodSlug | null>(
     initialPrimaryMood?.slug ?? null,
@@ -118,25 +123,49 @@ export function BookEditor({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
-  const pendingMediaDeletionsRef = useRef(new Set<string>());
   const saveFunctionRef = useRef<() => Promise<void>>(async () => undefined);
+  const undoStackRef = useRef<JournalBook[]>([]);
+  const redoStackRef = useRef<JournalBook[]>([]);
+  const historyGroupRef = useRef<{ key: string; at: number } | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
+  const retryDelayRef = useRef(2_000);
 
-  const changeBook = useCallback((transform: (draft: JournalBook) => void) => {
-    setBook((current) => {
-      const next = structuredClone(current);
-      transform(next);
-      bookRef.current = next;
-      dirtyRef.current = true;
-      setStatus("unsaved");
-      return next;
-    });
+  const changeBook = useCallback((
+    transform: (draft: JournalBook) => void | boolean | PageElement | null,
+    options: { recordHistory?: boolean; historyGroup?: string } = {},
+  ) => {
+    const current = bookRef.current;
+    const next = structuredClone(current);
+    const changed = transform(next);
+    if (changed === false || changed === null) return;
+    if (options.recordHistory !== false) {
+      const now = Date.now();
+      const grouped = options.historyGroup
+        && historyGroupRef.current?.key === options.historyGroup
+        && now - historyGroupRef.current.at < 900;
+      if (!grouped) undoStackRef.current = pushBookSnapshot(undoStackRef.current, current);
+      historyGroupRef.current = options.historyGroup ? { key: options.historyGroup, at: now } : null;
+      redoStackRef.current = [];
+      setCanUndo(true);
+      setCanRedo(false);
+    }
+    bookRef.current = next;
+    dirtyRef.current = true;
+    setStatus("unsaved");
+    setBook(next);
   }, []);
 
   const saveNow = useCallback(async () => {
     if (!dirtyRef.current || savingRef.current) return;
+    if (!navigator.onLine) {
+      setIsOnline(false);
+      setStatus("offline");
+      return;
+    }
 
     savingRef.current = true;
     dirtyRef.current = false;
+    if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
     setStatus("saving");
 
     try {
@@ -162,18 +191,19 @@ export function BookEditor({
 
       revisionRef.current = result.revision;
       setRevision(result.revision);
-      for (const mediaId of pendingMediaDeletionsRef.current) {
-        const deleteResponse = await fetch(`/api/media/${mediaId}`, { method: "DELETE" });
-        if (deleteResponse.ok) pendingMediaDeletionsRef.current.delete(mediaId);
-      }
+      retryDelayRef.current = 2_000;
       setStatus(dirtyRef.current ? "unsaved" : "saved");
     } catch {
       dirtyRef.current = true;
-      setStatus("error");
+      const online = navigator.onLine;
+      setIsOnline(online);
+      setStatus(online ? "error" : "offline");
     } finally {
       savingRef.current = false;
-      if (dirtyRef.current) {
-        window.setTimeout(() => void saveFunctionRef.current(), 500);
+      if (dirtyRef.current && navigator.onLine) {
+        const delay = retryDelayRef.current;
+        retryDelayRef.current = Math.min(delay * 2, 30_000);
+        retryTimerRef.current = window.setTimeout(() => void saveFunctionRef.current(), delay);
       }
     }
   }, [entryDate]);
@@ -188,8 +218,36 @@ export function BookEditor({
     return () => window.clearTimeout(timeout);
   }, [book, primaryMoodSlug, saveNow]);
 
+  useEffect(() => {
+    const updateConnection = () => {
+      const online = navigator.onLine;
+      setIsOnline(online);
+      if (!online && dirtyRef.current) setStatus("offline");
+      if (online && dirtyRef.current) void saveFunctionRef.current();
+    };
+    const initialCheck = window.setTimeout(updateConnection, 0);
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    return () => {
+      window.clearTimeout(initialCheck);
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+    };
+  }, []);
+
+  useEffect(() => {
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      event.preventDefault();
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, []);
+
   useEffect(() => () => {
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
   }, []);
 
   function selectMood(slug: MoodSlug) {
@@ -198,6 +256,34 @@ export function BookEditor({
     setPrimaryMoodSlug(nextMood);
     dirtyRef.current = true;
     setStatus("unsaved");
+  }
+
+  function applyLocalBook(next: JournalBook) {
+    const snapshot = structuredClone(next);
+    bookRef.current = snapshot;
+    setBook(snapshot);
+    dirtyRef.current = true;
+    historyGroupRef.current = null;
+    setStatus("unsaved");
+    setSelectedElement(null);
+  }
+
+  function undoBookChange() {
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
+    redoStackRef.current = pushBookSnapshot(redoStackRef.current, bookRef.current);
+    applyLocalBook(previous);
+    setCanUndo(undoStackRef.current.length > 0);
+    setCanRedo(true);
+  }
+
+  function redoBookChange() {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current = pushBookSnapshot(undoStackRef.current, bookRef.current);
+    applyLocalBook(next);
+    setCanUndo(true);
+    setCanRedo(redoStackRef.current.length > 0);
   }
 
   function goToSpread(nextIndex: number) {
@@ -401,7 +487,7 @@ export function BookEditor({
       const page = draft.pages.find((candidate) => candidate.id === pageId);
       const element = page?.elements.find((candidate) => candidate.id === elementId);
       if (element?.type === "text") element.content.text = text;
-    });
+    }, { historyGroup: `text:${pageId}:${elementId}` });
   }
 
   function addSticker(stickerId: string) {
@@ -443,19 +529,74 @@ export function BookEditor({
     });
   }
 
+  function duplicateSelectedElement() {
+    if (!selectedElement) return;
+    const nextId = crypto.randomUUID();
+    changeBook((draft) => {
+      duplicateBookElement(draft, selectedElement.pageId, selectedElement.elementId, nextId);
+    });
+    setSelectedElement({ pageId: selectedElement.pageId, elementId: nextId });
+  }
+
+  function nudgeSelectedElement(deltaX: number, deltaY: number) {
+    if (!selectedElement) return;
+    changeBook((draft) => {
+      nudgeBookElement(draft, selectedElement.pageId, selectedElement.elementId, deltaX, deltaY);
+    }, { historyGroup: `nudge:${selectedElement.pageId}:${selectedElement.elementId}` });
+  }
+
   function deleteSelectedElement() {
     if (!selectedElement) return;
     changeBook((draft) => {
       const page = draft.pages.find((candidate) => candidate.id === selectedElement.pageId);
       if (page) {
-        const element = page.elements.find((candidate) => candidate.id === selectedElement.elementId);
-        if (element?.type === "photo" || element?.type === "audio") pendingMediaDeletionsRef.current.add(element.content.mediaId);
         page.elements = page.elements.filter(
           (element) => element.id !== selectedElement.elementId,
         );
       }
     });
     setSelectedElement(null);
+  }
+
+  function handleResizePointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    pageId: string,
+    element: PageElement,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (element.frame.locked || element.type === "text" || element.type === "drawing") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const pageElement = event.currentTarget.closest<HTMLElement>("[data-book-page]");
+    if (!pageElement) return;
+    const pageRect = pageElement.getBoundingClientRect();
+    const startX = event.clientX;
+    const initialWidth = element.frame.width;
+    let recorded = false;
+
+    function move(pointerEvent: PointerEvent) {
+      if (!recorded) {
+        undoStackRef.current = pushBookSnapshot(undoStackRef.current, bookRef.current);
+        redoStackRef.current = [];
+        setCanUndo(true);
+        setCanRedo(false);
+        recorded = true;
+      }
+      const deltaWidth = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
+      changeBook((draft) => {
+        resizeBookElement(draft, pageId, element.id, initialWidth + deltaWidth);
+      }, { recordHistory: false });
+    }
+
+    function finish() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    }
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
   }
 
   function handleElementPointerDown(
@@ -476,23 +617,35 @@ export function BookEditor({
     const startY = event.clientY;
     const initialX = element.frame.x;
     const initialY = element.frame.y;
+    let recorded = false;
 
     function move(pointerEvent: PointerEvent) {
+      if (!recorded) {
+        undoStackRef.current = pushBookSnapshot(undoStackRef.current, bookRef.current);
+        redoStackRef.current = [];
+        setCanUndo(true);
+        setCanRedo(false);
+        recorded = true;
+      }
       const deltaX = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
       const deltaY = ((pointerEvent.clientY - startY) / pageRect.height) * 1400;
-      updateElement(pageId, element.id, (draftElement) => {
+      changeBook((draft) => {
+        const draftElement = draft.pages.find((page) => page.id === pageId)?.elements.find((candidate) => candidate.id === element.id);
+        if (!draftElement) return;
         draftElement.frame.x = clamp(initialX + deltaX, 0, 1000 - draftElement.frame.width);
         draftElement.frame.y = clamp(initialY + deltaY, 0, 1400 - draftElement.frame.height);
-      });
+      }, { recordHistory: false });
     }
 
     function finish() {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
     }
 
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
   }
 
   const selectedElementData = selectedElement
@@ -502,6 +655,47 @@ export function BookEditor({
     : null;
   const visiblePages = pagesInSpread(book, spreadIndex);
   const totalSpreads = spreadCount(book);
+
+  const handleKeyboardShortcut = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+    const modifier = event.ctrlKey || event.metaKey;
+    if (modifier && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) redoBookChange();
+      else undoBookChange();
+      return;
+    }
+    if (modifier && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      redoBookChange();
+      return;
+    }
+    if (event.key === "Escape") {
+      setSelectedElement(null);
+      return;
+    }
+    if ((event.key === "Delete" || event.key === "Backspace") && selectedElement) {
+      event.preventDefault();
+      deleteSelectedElement();
+      return;
+    }
+    const distance = event.shiftKey ? 25 : 5;
+    const directions: Record<string, [number, number]> = {
+      ArrowLeft: [-distance, 0], ArrowRight: [distance, 0],
+      ArrowUp: [0, -distance], ArrowDown: [0, distance],
+    };
+    const direction = directions[event.key];
+    if (direction && selectedElement) {
+      event.preventDefault();
+      nudgeSelectedElement(...direction);
+    }
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyboardShortcut);
+    return () => window.removeEventListener("keydown", handleKeyboardShortcut);
+  }, []);
 
   return (
     <div className="book-editor" data-entry-id={entryId}>
@@ -516,8 +710,10 @@ export function BookEditor({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SaveIndicator status={status} />
+          <button type="button" onClick={undoBookChange} disabled={!canUndo} className="tool-pill disabled:cursor-not-allowed disabled:opacity-40" title="Deshacer (Ctrl+Z)" aria-label="Deshacer último cambio" aria-keyshortcuts="Control+Z Meta+Z">↶ Deshacer</button>
+          <button type="button" onClick={redoBookChange} disabled={!canRedo} className="tool-pill disabled:cursor-not-allowed disabled:opacity-40" title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer último cambio" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y">↷ Rehacer</button>
           <button type="button" onClick={() => void toggleHistory()} className="rounded-full border border-[var(--brown-light)] bg-[#fff3d4] px-4 py-2 text-xs font-bold text-[var(--brown)]">{historyOpen ? "Cerrar historial" : "Historial"}</button>
-          {(status === "error" || status === "unsaved") && (
+          {(status === "error" || status === "unsaved" || status === "offline") && (
             <button
               type="button"
               onClick={() => void saveNow()}
@@ -537,6 +733,12 @@ export function BookEditor({
           )}
         </div>
       </div>
+
+      {!isOnline && (
+        <div role="status" className="mb-5 rounded-2xl border border-[#bd7964] bg-[#f7ddce] px-5 py-3 text-sm font-semibold text-[#713426]">
+          Estás sin conexión. Puedes seguir editando esta página; Green Days intentará guardarla cuando vuelva internet. No cierres la pestaña mientras haya cambios pendientes.
+        </div>
+      )}
 
       {historyOpen && (
         <section className="mb-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--paper)] p-5" aria-labelledby="history-title">
@@ -671,33 +873,20 @@ export function BookEditor({
                 <button
                   type="button"
                   onClick={() =>
-                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
-                      const ratio = element.frame.height / element.frame.width;
-                      const nextWidth = clamp(element.frame.width + 40, 90, 900);
-                      const nextHeight = clamp(nextWidth * ratio, 80, 1100);
-                      element.frame.width = nextWidth;
-                      element.frame.height = nextHeight;
-                      element.frame.x = clamp(element.frame.x, 0, 1000 - nextWidth);
-                      element.frame.y = clamp(element.frame.y, 0, 1400 - nextHeight);
-                    })
+                    changeBook((draft) => resizeBookElement(draft, selectedElement.pageId, selectedElement.elementId, selectedElementData.frame.width + 40))
                   }
                   className="tool-pill"
-                  aria-label="Aumentar sticker"
+                  aria-label="Aumentar elemento"
                 >
                   +
                 </button>
                 <button
                   type="button"
                   onClick={() =>
-                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
-                      const ratio = element.frame.height / element.frame.width;
-                      const nextWidth = clamp(element.frame.width - 40, 90, 900);
-                      element.frame.width = nextWidth;
-                      element.frame.height = clamp(nextWidth * ratio, 80, 1100);
-                    })
+                    changeBook((draft) => resizeBookElement(draft, selectedElement.pageId, selectedElement.elementId, selectedElementData.frame.width - 40))
                   }
                   className="tool-pill"
-                  aria-label="Reducir sticker"
+                  aria-label="Reducir elemento"
                 >
                   −
                 </button>
@@ -707,13 +896,15 @@ export function BookEditor({
                 })} className="tool-pill">Al frente</button>
                 <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { element.frame.zIndex = 0; })} className="tool-pill">Al fondo</button>
                 <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { element.frame.locked = !element.frame.locked; })} className="tool-pill">{selectedElementData.frame.locked ? "Desbloquear" : "Bloquear"}</button>
+                <button type="button" onClick={duplicateSelectedElement} className="tool-pill">Duplicar</button>
                 {selectedElementData.type === "photo" && <select value={selectedElementData.content.filter} onChange={(event) => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => { if (element.type === "photo") element.content.filter = event.target.value as "none" | "warm" | "vintage" | "mono"; })} className="tool-pill"><option value="none">Sin filtro</option><option value="warm">Cálido</option><option value="vintage">Vintage</option><option value="mono">Blanco y negro</option></select>}
+                {selectedElementData.type === "photo" && <div className="flex items-center gap-1" role="group" aria-label="Ajustar encuadre de la fotografía"><button type="button" onClick={() => changeBook((draft) => cropPhoto(draft, selectedElement.pageId, selectedElement.elementId, -0.08, 0))} className="tool-pill" aria-label="Mover encuadre a la izquierda">Foto ←</button><button type="button" onClick={() => changeBook((draft) => cropPhoto(draft, selectedElement.pageId, selectedElement.elementId, 0.08, 0))} className="tool-pill" aria-label="Mover encuadre a la derecha">Foto →</button><button type="button" onClick={() => changeBook((draft) => cropPhoto(draft, selectedElement.pageId, selectedElement.elementId, 0, -0.08))} className="tool-pill" aria-label="Mover encuadre hacia arriba">Foto ↑</button><button type="button" onClick={() => changeBook((draft) => cropPhoto(draft, selectedElement.pageId, selectedElement.elementId, 0, 0.08))} className="tool-pill" aria-label="Mover encuadre hacia abajo">Foto ↓</button></div>}
                 <button
                   type="button"
                   onClick={deleteSelectedElement}
                   className="rounded-full bg-[#f1c8b4] px-4 py-2 text-xs font-bold text-[#843a28]"
                 >
-                  Quitar
+                  Quitar del libro
                 </button>
               </>
             )}
@@ -791,6 +982,7 @@ export function BookEditor({
                         key={element.id}
                         type="button"
                         onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
+                        onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }}
                         className={`absolute overflow-hidden rounded-[4%] border-4 bg-[#fff8e8] shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-white"}`}
                         style={frameStyle}
                         aria-label={`Fotografía${element.content.caption ? `: ${element.content.caption}` : ""}. Arrástrala para moverla.`}
@@ -805,7 +997,7 @@ export function BookEditor({
                     const isSelected = selectedElement?.elementId === element.id;
                     return (
                       <div key={element.id} className={`absolute overflow-hidden rounded-2xl border bg-[#fff7e2] p-3 shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-[var(--line)]"}`} style={frameStyle}>
-                        <button type="button" onPointerDown={(event) => handleElementPointerDown(event, page.id, element)} className="mb-2 flex w-full cursor-grab items-center justify-between gap-2 text-left text-[0.65rem] font-bold text-[var(--brown)]" aria-label={`Mover audio ${element.content.label}`}><span className="truncate">🎵 {element.content.label}</span><span aria-hidden="true">{element.frame.locked ? "🔒" : "⠿"}</span></button>
+                        <button type="button" onPointerDown={(event) => handleElementPointerDown(event, page.id, element)} onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }} className="mb-2 flex w-full cursor-grab items-center justify-between gap-2 text-left text-[0.65rem] font-bold text-[var(--brown)]" aria-label={`Mover audio ${element.content.label}`}><span className="truncate">🎵 {element.content.label}</span><span aria-hidden="true">{element.frame.locked ? "🔒" : "⠿"}</span></button>
                         <audio controls preload="metadata" src={`/api/media/${element.content.mediaId}`} className="h-9 w-full" aria-label={element.content.label} />
                       </div>
                     );
@@ -818,6 +1010,7 @@ export function BookEditor({
                         key={element.id}
                         type="button"
                         onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
+                        onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }}
                         className={`page-sticker ${isSelected ? "is-selected" : ""}`}
                         style={{ ...frameStyle, opacity: element.content.opacity }}
                         aria-label={`Sticker ${element.content.stickerId}. Arrástralo para moverlo.`}
@@ -829,6 +1022,21 @@ export function BookEditor({
 
                   return null;
                 })}
+                {selectedElement && selectedElement.pageId === page.id && selectedElementData
+                  && selectedElementData.type !== "text" && selectedElementData.type !== "drawing"
+                  && !selectedElementData.frame.locked && editorTool === "write" && (
+                    <button
+                      type="button"
+                      onPointerDown={(event) => handleResizePointerDown(event, page.id, selectedElementData)}
+                      className="absolute z-40 grid size-7 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-white bg-[var(--ochre)] text-xs font-black text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brown-dark)]"
+                      style={{
+                        left: `${(selectedElementData.frame.x + selectedElementData.frame.width) / 10}%`,
+                        top: `${(selectedElementData.frame.y + selectedElementData.frame.height) / 14}%`,
+                      }}
+                      aria-label="Arrastrar para cambiar el tamaño del elemento seleccionado"
+                      title="Arrastra para cambiar tamaño"
+                    >↘</button>
+                  )}
                 {editorTool === "draw" && isOpen && (
                   <div
                     className="absolute inset-0 z-50 cursor-crosshair touch-none"
@@ -873,7 +1081,7 @@ export function BookEditor({
 
       {isOpen && (
         <p className="mt-5 text-center text-sm leading-6 text-[var(--muted)]">
-          Escribe, dibuja o coloca stickers. Añade pliegos cuando necesites más espacio; todo conserva su posición al guardarse.
+          Escribe, dibuja o coloca stickers. Con una capa seleccionada puedes usar las flechas para moverla, Mayús para avanzar más y Suprimir para quitarla.
         </p>
       )}
     </div>
