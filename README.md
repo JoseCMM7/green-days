@@ -52,12 +52,20 @@ La etapa 6 del editor creativo avanzado está completa en desarrollo local:
 - Historial visible con restauración segura de revisiones.
 - Libros históricos conectados con calendario, álbumes y cápsulas del tiempo.
 
+La etapa 7 estabiliza esa experiencia antes del lanzamiento:
+
+- Deshacer y rehacer hasta 50 estados, duplicar capas y recortar fotografías.
+- Movimiento por teclado y redimensionado con ratón, lápiz o pantalla táctil.
+- Autoguardado tolerante a desconexiones con reintentos progresivos.
+- Pruebas E2E de escritorio y móvil mediante Playwright.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
 [guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
 etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
 La preparación previa al lanzamiento está documentada en la
 [guía de la etapa 5](./docs/stage-5.md).
 El editor creativo terminado está en la [guía de la etapa 6](./docs/stage-6.md).
+La estabilización previa al lanzamiento está en la [guía de la etapa 7](./docs/stage-7.md).
 
 ## Ejecutar localmente
 
@@ -79,6 +87,7 @@ pnpm lint     # revisión estática del código
 pnpm build    # compilación de producción
 pnpm start    # ejecutar la compilación de producción
 pnpm test:models   # validar el modelo documental del libro
+pnpm test:e2e      # probar acceso, seguridad y adaptación en Chrome
 pnpm db:generate  # generar SQL después de cambiar el esquema
 pnpm db:migrate   # aplicar migraciones a Supabase
 pnpm db:studio    # explorar PostgreSQL con Drizzle Studio

@@ -55,5 +55,5 @@ recuperable. No se realizó ningún despliegue.
 - Compilación optimizada de Next.js completada.
 - Migración de Storage aplicada correctamente en Supabase.
 
-La siguiente etapa eventual será preparar y ejecutar el lanzamiento. Se mantiene
-fuera de alcance hasta decidir que el producto ya no necesita cambios importantes.
+La etapa 7 continúa con estabilización, recuperación local, accesibilidad y
+pruebas de navegador antes de preparar el lanzamiento.
