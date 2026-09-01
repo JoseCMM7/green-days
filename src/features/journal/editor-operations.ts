@@ -2,6 +2,8 @@ import type { PageElement } from "@/db/mongodb/schemas";
 import type { JournalBook } from "./default-book";
 
 export const MAX_UNDO_STEPS = 50;
+export const MIN_BOOK_ZOOM = 0.75;
+export const MAX_BOOK_ZOOM = 1.5;
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -12,9 +14,25 @@ export function pushBookSnapshot(stack: JournalBook[], book: JournalBook) {
   return next.slice(-MAX_UNDO_STEPS);
 }
 
+export function clampBookZoom(value: number) {
+  return clamp(value, MIN_BOOK_ZOOM, MAX_BOOK_ZOOM);
+}
+
+export function directionForSwipe(deltaX: number, deltaY: number, minimumDistance = 55) {
+  if (Math.abs(deltaX) < minimumDistance || Math.abs(deltaX) <= Math.abs(deltaY)) return null;
+  return deltaX < 0 ? "next" as const : "previous" as const;
+}
+
+export function mediaIdsInElements(elements: PageElement[]) {
+  return new Set(elements.flatMap((element) => {
+    if (element.type === "photo" || element.type === "audio") return [element.content.mediaId];
+    if (element.type === "sticker" && element.content.customMediaId) return [element.content.customMediaId];
+    return [];
+  }));
+}
+
 export function mediaIdsInBook(book: JournalBook) {
-  return new Set(book.pages.flatMap((page) => page.elements)
-    .flatMap((element) => element.type === "photo" || element.type === "audio" ? [element.content.mediaId] : []));
+  return mediaIdsInElements(book.pages.flatMap((page) => page.elements));
 }
 
 export function duplicateBookElement(book: JournalBook, pageId: string, elementId: string, nextId: string) {

@@ -17,7 +17,8 @@ import {
 } from "@/features/journal/book-pages";
 import type { JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
-import { cropPhoto, duplicateBookElement, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
+import { clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
+import { preparePhotoForUpload } from "@/features/media/photo-preparation";
 
 type BookEditorProps = {
   entryId: string;
@@ -31,7 +32,7 @@ type SaveStatus = "saved" | "unsaved" | "saving" | "offline" | "error" | "confli
 type DrawingElement = Extract<PageElement, { type: "drawing" }>;
 type DrawingPoint = DrawingElement["content"]["paths"][number][number];
 type EditorTool = "write" | "draw";
-type MediaStatus = "idle" | "uploading" | "recording" | "error";
+type MediaStatus = "idle" | "preparing" | "uploading" | "recording" | "error";
 type HistoryItem = { revision: number; savedAt: string; pageCount: number; excerpt: string };
 
 const stickerPalette = [
@@ -100,6 +101,7 @@ export function BookEditor({
   } | null>(null);
   const [mediaStatus, setMediaStatus] = useState<MediaStatus>("idle");
   const [mediaMessage, setMediaMessage] = useState<string | null>(null);
+  const [mediaProgress, setMediaProgress] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "loading" | "error" | "restoring">("idle");
@@ -107,6 +109,8 @@ export function BookEditor({
   const [isOnline, setIsOnline] = useState(true);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [bookZoom, setBookZoom] = useState(1);
+  const [turnDirection, setTurnDirection] = useState<"next" | "previous" | null>(null);
   const [revision, setRevision] = useState(initialRevision);
   const [primaryMoodSlug, setPrimaryMoodSlug] = useState<MoodSlug | null>(
     initialPrimaryMood?.slug ?? null,
@@ -129,6 +133,8 @@ export function BookEditor({
   const historyGroupRef = useRef<{ key: string; at: number } | null>(null);
   const retryTimerRef = useRef<number | null>(null);
   const retryDelayRef = useRef(2_000);
+  const pageTurnTimerRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const changeBook = useCallback((
     transform: (draft: JournalBook) => void | boolean | PageElement | null,
@@ -248,6 +254,7 @@ export function BookEditor({
   useEffect(() => () => {
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+    if (pageTurnTimerRef.current !== null) window.clearTimeout(pageTurnTimerRef.current);
   }, []);
 
   function selectMood(slug: MoodSlug) {
@@ -288,11 +295,32 @@ export function BookEditor({
 
   function goToSpread(nextIndex: number) {
     const safeIndex = clamp(nextIndex, 0, spreadCount(bookRef.current) - 1);
+    if (safeIndex === spreadIndex) return;
     const [firstPage] = pagesInSpread(bookRef.current, safeIndex);
+    setTurnDirection(safeIndex > spreadIndex ? "next" : "previous");
+    if (pageTurnTimerRef.current !== null) window.clearTimeout(pageTurnTimerRef.current);
+    pageTurnTimerRef.current = window.setTimeout(() => setTurnDirection(null), 420);
     setSpreadIndex(safeIndex);
     if (firstPage) setActivePageId(firstPage.id);
     setSelectedElement(null);
     setDrawingPreview([]);
+  }
+
+  function beginPageSwipe(event: React.TouchEvent<HTMLElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, textarea, input, select, audio, [data-editor-element]")) return;
+    const touch = event.touches[0];
+    if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function finishPageSwipe(event: React.TouchEvent<HTMLElement>) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || editorTool === "draw") return;
+    const direction = directionForSwipe(touch.clientX - start.x, touch.clientY - start.y);
+    if (direction === "next") goToSpread(spreadIndex + 1);
+    if (direction === "previous") goToSpread(spreadIndex - 1);
   }
 
   function addSpread() {
@@ -377,12 +405,31 @@ export function BookEditor({
   }
 
   async function uploadMedia(file: File) {
-    setMediaStatus("uploading");
-    setMediaMessage("Subiendo…");
-    const formData = new FormData();
-    formData.set("file", file);
     try {
+      const originalName = file.name;
+      let uploadFile = file;
+      let dimensions: { width: number; height: number } | null = null;
+      setMediaProgress(4);
+      if (file.type.startsWith("image/")) {
+        setMediaStatus("preparing");
+        const prepared = await preparePhotoForUpload(file, (progress, message) => {
+          setMediaProgress(progress);
+          setMediaMessage(message);
+        });
+        uploadFile = prepared.file;
+        dimensions = { width: prepared.width, height: prepared.height };
+      }
+      setMediaStatus("uploading");
+      setMediaProgress(45);
+      setMediaMessage("Guardando el archivo privado…");
+      const formData = new FormData();
+      formData.set("file", uploadFile);
+      if (dimensions) {
+        formData.set("width", String(dimensions.width));
+        formData.set("height", String(dimensions.height));
+      }
       const response = await fetch(`/api/journal/${entryDate}/media`, { method: "POST", body: formData });
+      setMediaProgress(88);
       const result = (await response.json()) as { id?: string; kind?: "photo" | "audio"; error?: string };
       if (!response.ok || !result.id || !result.kind) throw new Error(result.error ?? "No se pudo subir.");
       const elementId = crypto.randomUUID();
@@ -394,22 +441,24 @@ export function BookEditor({
           page.elements.push({
             id: elementId, type: "photo",
             frame: { x: 180, y: 260, width: 640, height: 560, rotation: -2, zIndex, locked: false },
-            content: { mediaId: result.id!, fit: "cover", cropX: 0.5, cropY: 0.5, filter: "none", caption: file.name.slice(0, 120) },
+            content: { mediaId: result.id!, fit: "cover", cropX: 0.5, cropY: 0.5, filter: "none", caption: originalName.slice(0, 120) },
           });
         } else {
           page.elements.push({
             id: elementId, type: "audio",
             frame: { x: 130, y: 520, width: 740, height: 190, rotation: 0, zIndex, locked: false },
-            content: { mediaId: result.id!, label: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || "Recuerdo de audio", waveformColor: "#b8781d" },
+            content: { mediaId: result.id!, label: originalName.replace(/\.[^.]+$/, "").slice(0, 120) || "Recuerdo de audio", waveformColor: "#b8781d" },
           });
         }
       });
       setSelectedElement({ pageId: activePageId, elementId });
       setEditorTool("write");
       setMediaStatus("idle");
+      setMediaProgress(100);
       setMediaMessage(result.kind === "photo" ? "Fotografía añadida." : "Audio añadido.");
     } catch (error) {
       setMediaStatus("error");
+      setMediaProgress(0);
       setMediaMessage(error instanceof Error ? error.message : "No pudimos subir el archivo.");
     }
   }
@@ -807,11 +856,11 @@ export function BookEditor({
             <div className="mt-2 flex flex-wrap gap-2">
               <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMedia(file); event.currentTarget.value = ""; }} />
               <input ref={audioInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/webm,audio/ogg,audio/wav" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMedia(file); event.currentTarget.value = ""; }} />
-              <button type="button" disabled={!isOpen || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => photoInputRef.current?.click()} className="tool-pill disabled:opacity-40">📷 Fotografía</button>
-              <button type="button" disabled={!isOpen || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => audioInputRef.current?.click()} className="tool-pill disabled:opacity-40">🎵 Adjuntar audio</button>
-              {mediaStatus === "recording" ? <button type="button" onClick={stopRecording} className="rounded-full bg-[#d96b55] px-4 py-2 text-xs font-bold text-white">■ Detener</button> : <button type="button" disabled={!isOpen || mediaStatus === "uploading"} onClick={() => void startRecording()} className="tool-pill disabled:opacity-40">🎙️ Grabar</button>}
+              <button type="button" disabled={!isOpen || mediaStatus === "preparing" || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => photoInputRef.current?.click()} className="tool-pill disabled:opacity-40">📷 Fotografía</button>
+              <button type="button" disabled={!isOpen || mediaStatus === "preparing" || mediaStatus === "uploading" || mediaStatus === "recording"} onClick={() => audioInputRef.current?.click()} className="tool-pill disabled:opacity-40">🎵 Adjuntar audio</button>
+              {mediaStatus === "recording" ? <button type="button" onClick={stopRecording} className="rounded-full bg-[#d96b55] px-4 py-2 text-xs font-bold text-white">■ Detener</button> : <button type="button" disabled={!isOpen || mediaStatus === "preparing" || mediaStatus === "uploading"} onClick={() => void startRecording()} className="tool-pill disabled:opacity-40">🎙️ Grabar</button>}
             </div>
-            {mediaMessage && <p className={`mt-2 max-w-xs text-xs ${mediaStatus === "error" ? "text-[#843a28]" : "text-[var(--muted)]"}`} role="status">{mediaStatus === "uploading" ? "Subiendo…" : mediaMessage}</p>}
+            {mediaMessage && <div className="mt-2 max-w-xs" role="status"><p className={`text-xs ${mediaStatus === "error" ? "text-[#843a28]" : "text-[var(--muted)]"}`}>{mediaMessage}</p>{(mediaStatus === "preparing" || mediaStatus === "uploading") && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#ead8b0]" aria-label={`Progreso ${mediaProgress}%`}><span className="block h-full rounded-full bg-[var(--ochre)] transition-[width]" style={{ width: `${mediaProgress}%` }} /></div>}</div>}
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--muted)]">
@@ -834,6 +883,11 @@ export function BookEditor({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">Zoom</span>
+            <button type="button" onClick={() => setBookZoom((value) => clampBookZoom(value - 0.25))} disabled={bookZoom <= 0.75} className="tool-pill disabled:opacity-40" aria-label="Alejar el libro">−</button>
+            <button type="button" onClick={() => setBookZoom(1)} className="tool-pill min-w-16" aria-label="Restablecer zoom al cien por ciento">{Math.round(bookZoom * 100)}%</button>
+            <button type="button" onClick={() => setBookZoom((value) => clampBookZoom(value + 0.25))} disabled={bookZoom >= 1.5} className="tool-pill disabled:opacity-40" aria-label="Acercar el libro">+</button>
+            <span className="mx-1 h-7 w-px bg-[var(--line)]" />
             <span className="mr-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
               Pliego
             </span>
@@ -912,9 +966,12 @@ export function BookEditor({
         </div>
       </section>
 
-      <div className="book-stage">
-        <div className={`book-object ${isOpen ? "is-open" : ""}`}>
-          <div className="book-pages" aria-hidden={!isOpen}>
+      <div className="book-stage" onTouchStart={beginPageSwipe} onTouchEnd={finishPageSwipe}>
+        <div
+          className={`book-object ${isOpen ? "is-open" : ""}`}
+          style={{ width: `min(${bookZoom * 100}%, ${74 * bookZoom}rem)` }}
+        >
+          <div className={`book-pages ${turnDirection ? `is-turning-${turnDirection}` : ""}`} aria-hidden={!isOpen} aria-live="polite">
             {visiblePages.map((page) => (
               <section
                 key={page.id}
@@ -981,6 +1038,7 @@ export function BookEditor({
                       <button
                         key={element.id}
                         type="button"
+                        data-editor-element
                         onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
                         onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }}
                         className={`absolute overflow-hidden rounded-[4%] border-4 bg-[#fff8e8] shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-white"}`}
@@ -996,7 +1054,7 @@ export function BookEditor({
                   if (element.type === "audio") {
                     const isSelected = selectedElement?.elementId === element.id;
                     return (
-                      <div key={element.id} className={`absolute overflow-hidden rounded-2xl border bg-[#fff7e2] p-3 shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-[var(--line)]"}`} style={frameStyle}>
+                      <div key={element.id} data-editor-element className={`absolute overflow-hidden rounded-2xl border bg-[#fff7e2] p-3 shadow-lg ${isSelected ? "border-[var(--ochre)]" : "border-[var(--line)]"}`} style={frameStyle}>
                         <button type="button" onPointerDown={(event) => handleElementPointerDown(event, page.id, element)} onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }} className="mb-2 flex w-full cursor-grab items-center justify-between gap-2 text-left text-[0.65rem] font-bold text-[var(--brown)]" aria-label={`Mover audio ${element.content.label}`}><span className="truncate">🎵 {element.content.label}</span><span aria-hidden="true">{element.frame.locked ? "🔒" : "⠿"}</span></button>
                         <audio controls preload="metadata" src={`/api/media/${element.content.mediaId}`} className="h-9 w-full" aria-label={element.content.label} />
                       </div>
@@ -1009,6 +1067,7 @@ export function BookEditor({
                       <button
                         key={element.id}
                         type="button"
+                        data-editor-element
                         onPointerDown={(event) => handleElementPointerDown(event, page.id, element)}
                         onFocus={() => { setActivePageId(page.id); setSelectedElement({ pageId: page.id, elementId: element.id }); }}
                         className={`page-sticker ${isSelected ? "is-selected" : ""}`}

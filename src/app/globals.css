@@ -102,6 +102,9 @@ a {
 .book-stage {
   perspective: 2200px;
   padding: clamp(0.5rem, 2.5vw, 2rem);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--brown-light) transparent;
 }
 
 .book-object {
@@ -156,6 +159,24 @@ a {
   border-radius: 0.15rem 1.1rem 1.1rem 0.15rem;
   transform: rotateY(-1.6deg);
   transform-origin: left center;
+}
+
+.book-pages.is-turning-next .notebook-page-right {
+  animation: page-arrive-next 400ms cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+.book-pages.is-turning-previous .notebook-page-left {
+  animation: page-arrive-previous 400ms cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+@keyframes page-arrive-next {
+  from { opacity: 0.3; transform: rotateY(-38deg); }
+  to { opacity: 1; transform: rotateY(-1.6deg); }
+}
+
+@keyframes page-arrive-previous {
+  from { opacity: 0.3; transform: rotateY(38deg); }
+  to { opacity: 1; transform: rotateY(1.6deg); }
 }
 
 .notebook-page-left::after,

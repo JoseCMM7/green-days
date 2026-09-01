@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { pageElementSchema } from "../src/db/mongodb/schemas";
 import { createDefaultBook } from "../src/features/journal/default-book";
 import type { JournalBook } from "../src/features/journal/default-book";
-import { cropPhoto, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "../src/features/journal/editor-operations";
+import { clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, mediaIdsInElements, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "../src/features/journal/editor-operations";
 
 function bookWithPhoto() {
   const book = createDefaultBook();
@@ -22,6 +23,18 @@ test("duplica una capa sin sacarla de la página", () => {
   assert.equal(duplicate?.frame.y, 1245);
   assert.equal(duplicate?.frame.locked, false);
   assert.equal(mediaIdsInBook(book).size, 1, "las copias comparten el mismo archivo privado");
+});
+
+test("las referencias de medios incluyen stickers personalizados", () => {
+  const customMediaId = crypto.randomUUID();
+  const sticker = pageElementSchema.parse({
+    id: crypto.randomUUID(),
+    type: "sticker",
+    frame: { x: 20, y: 20, width: 120, height: 120, rotation: 0, zIndex: 1, locked: false },
+    content: { stickerId: "personalizado", customMediaId },
+  });
+
+  assert.deepEqual([...mediaIdsInElements([sticker])], [customMediaId]);
 });
 
 test("mueve, redimensiona y recorta respetando los límites", () => {
@@ -48,4 +61,14 @@ test("el historial local conserva como máximo cincuenta estados independientes"
   book.title = "Mutación posterior";
   assert.equal(snapshots.length, MAX_UNDO_STEPS);
   assert.equal(snapshots.at(-1)?.title, `Versión ${MAX_UNDO_STEPS + 4}`);
+});
+
+test("limita el zoom y distingue un gesto horizontal intencional", () => {
+  assert.equal(clampBookZoom(0.2), 0.75);
+  assert.equal(clampBookZoom(1.25), 1.25);
+  assert.equal(clampBookZoom(3), 1.5);
+  assert.equal(directionForSwipe(-80, 10), "next");
+  assert.equal(directionForSwipe(80, 10), "previous");
+  assert.equal(directionForSwipe(20, 5), null);
+  assert.equal(directionForSwipe(80, 100), null);
 });
