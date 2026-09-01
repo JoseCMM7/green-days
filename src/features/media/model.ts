@@ -2,6 +2,8 @@ export const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "im
 export const AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg", "audio/wav"]);
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+export const MAX_USER_STORAGE_BYTES = 500 * 1024 * 1024;
+export const UNUSED_MEDIA_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export function mediaKindForType(mimeType: string) {
   if (PHOTO_TYPES.has(mimeType)) return "photo" as const;
@@ -25,4 +27,18 @@ export function extensionForMedia(mimeType: string) {
     "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/webm": "webm", "audio/ogg": "ogg", "audio/wav": "wav",
   };
   return extensions[mimeType] ?? "bin";
+}
+
+export function formatStorageBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+export function selectUnusedMediaAssets<T extends { id: string; createdAt: Date }>(
+  assets: T[],
+  referencedIds: ReadonlySet<string>,
+  now = new Date(),
+) {
+  const cutoff = now.getTime() - UNUSED_MEDIA_GRACE_MS;
+  return assets.filter((asset) => asset.createdAt.getTime() < cutoff && !referencedIds.has(asset.id));
 }

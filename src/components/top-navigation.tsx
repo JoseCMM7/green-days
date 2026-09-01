@@ -38,6 +38,17 @@ export function TopNavigation() {
     return null;
   }
 
+  if (pathname === "/showcase") {
+    return (
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(244,226,187,0.94)] backdrop-blur-xl">
+        <div className="mx-auto flex h-[5.25rem] w-full max-w-[92rem] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
+          <BrandMark />
+          <div className="flex items-center gap-2"><Link href="/auth/login" className="rounded-full border border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold sm:text-sm">Entrar</Link><Link href="/auth/sign-up" className="rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold sm:text-sm">Crear mi diario</Link></div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(244,226,187,0.92)] shadow-[0_8px_30px_rgba(91,59,32,0.06)] backdrop-blur-xl">

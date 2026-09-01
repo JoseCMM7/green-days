@@ -30,3 +30,11 @@ test("la pantalla de acceso cabe en el ancho disponible y conserva el salto de t
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Saltar al contenido" })).toBeFocused();
 });
+
+test("la presentación pública explica el producto sin exigir una sesión", async ({ page }) => {
+  await page.goto("/showcase");
+  await expect(page.getByRole("heading", { name: "Un diario digital que todavía se siente como un libro." })).toBeVisible();
+  await expect(page.getByText("Privacidad desde la arquitectura")).toBeVisible();
+  const sizes = await page.locator("html").evaluate((element) => ({ viewport: element.clientWidth, content: element.scrollWidth }));
+  expect(sizes.content).toBeLessThanOrEqual(sizes.viewport + 1);
+});

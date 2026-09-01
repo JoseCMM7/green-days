@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 
 type AuthShellProps = {
@@ -23,6 +24,7 @@ export function AuthShell({ eyebrow, title, description, children }: AuthShellPr
         </h1>
         <p className="mt-3 leading-7 text-[var(--muted)]">{description}</p>
         {children}
+        <p className="mt-6 text-center text-xs text-[var(--muted)]"><Link href="/showcase" className="font-bold underline decoration-[var(--yellow)] underline-offset-4">Conocer el proyecto antes de entrar</Link></p>
       </div>
     </main>
   );
