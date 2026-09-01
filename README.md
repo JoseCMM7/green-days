@@ -67,6 +67,15 @@ La etapa 8 pule el producto y lo hace presentable sin desplegarlo:
 - Presentación pública del producto en `/showcase` sin exponer diarios personales.
 - Recorrido E2E autenticado opcional con una cuenta exclusiva de pruebas.
 
+La etapa 9 transforma el diario en una experiencia física e inmersiva:
+
+- Portada de cuero envejecido con textura original, grosor de hojas, lomo y sombras 3D.
+- Escritura con tipografía de lápiz, caja movible y tamaño ajustable.
+- Stickers y otras capas redimensionables y transferibles entre las dos páginas.
+- Hojeado desde las esquinas, gestos táctiles y controles móviles siempre accesibles.
+- El calendario abre cada fecha como un separador colocado dentro del diario.
+- Herramientas guardadas en un estuche plegable y navegación global oculta al escribir.
+
 Consulta la [arquitectura de datos](./docs/architecture/database.md) y la
 [guía de la etapa 3](./docs/stage-3.md). El alcance y progreso actual de la
 etapa siguiente están en la [guía de la etapa 4](./docs/stage-4.md).
@@ -75,6 +84,7 @@ La preparación previa al lanzamiento está documentada en la
 El editor creativo terminado está en la [guía de la etapa 6](./docs/stage-6.md).
 La estabilización previa al lanzamiento está en la [guía de la etapa 7](./docs/stage-7.md).
 El pulido y control de almacenamiento están en la [guía de la etapa 8](./docs/stage-8.md).
+El rediseño inmersivo del diario está en la [guía de la etapa 9](./docs/stage-9.md).
 
 ## Ejecutar localmente
 
