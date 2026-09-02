@@ -11,6 +11,10 @@ export default async function TodayJournalPage() {
 
   return (
     <main className="pb-28 pt-7 lg:pb-14 lg:pt-10">
+      <Link href="/calendar" className="journal-exit-link" aria-label="Salir del diario y volver al calendario">
+        <span aria-hidden="true">←</span>
+        Salir del diario
+      </Link>
       <div className="mx-auto w-full max-w-[92rem] px-3 sm:px-6 lg:px-10">
         <header className="mx-auto mb-7 max-w-3xl text-center">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--ochre)]">

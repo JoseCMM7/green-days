@@ -53,6 +53,8 @@ el mismo historial de deshacer. No duplica fotografías ni archivos privados.
 - Los gestos horizontales siguen funcionando sobre el papel libre.
 - El menú global se oculta en `/journal/*`; quedan solamente salidas discretas
   hacia el calendario y las cápsulas.
+- Una salida fija permanece visible con el libro cerrado o abierto y permite
+  volver al calendario aunque el usuario no haya escrito nada.
 - Las herramientas creativas están plegadas dentro de un “estuche de escritura”.
 
 ## Calendario como separador

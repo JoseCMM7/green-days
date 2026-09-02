@@ -26,9 +26,12 @@ export default async function DatedJournalPage({
 
   return (
     <main className="diary-room pb-28 pt-4 lg:pb-14 lg:pt-6">
+      <Link href="/calendar" className="journal-exit-link" aria-label="Salir del diario y volver al calendario">
+        <span aria-hidden="true">←</span>
+        Salir del diario
+      </Link>
       <div className="mx-auto w-full max-w-[94rem] px-3 sm:px-6 lg:px-10">
-        <header className="mb-2 flex flex-wrap items-center justify-between gap-3 px-2" aria-label="Salida del diario">
-          <Link href="/calendar" className="inline-flex items-center gap-2 border-b border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold text-[var(--brown)]"><span aria-hidden="true">←</span> Volver a los separadores</Link>
+        <header className="mb-2 flex flex-wrap items-center justify-end gap-3 px-2" aria-label="Acciones del diario">
           <p className="font-display text-lg font-semibold text-[var(--brown)]">Green Days · diario personal</p>
           <Link href={`/capsules?entry=${entry.entryId}`} className="border-b border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold text-[var(--brown)]">Guardar como cápsula</Link>
         </header>
