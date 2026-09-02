@@ -23,6 +23,11 @@ export default function TodayJournalError({
         <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-[var(--muted)]">
           La conexión puede haberse interrumpido por un momento. Vuelve a intentarlo; no se perdió ninguna entrada.
         </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="mx-auto mt-3 max-w-md border-l-4 border-[var(--ochre)] bg-[#fff6df] px-4 py-3 text-left text-xs font-semibold leading-5 text-[var(--brown)]">
+            Revisión local: confirma en MongoDB Atlas que el clúster esté activo y que tu IP actual aparezca en Security → Network Access.
+          </p>
+        )}
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <button
             type="button"
@@ -39,4 +44,3 @@ export default function TodayJournalError({
     </main>
   );
 }
-

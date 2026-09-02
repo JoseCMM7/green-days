@@ -109,7 +109,11 @@ Las migraciones ya aplicadas no se editan: cada cambio crea una migración nueva
 1. Crear un proyecto en Supabase y guardar su contraseña de base de datos.
 2. Copiar la URL del **Transaction Pooler** en `DATABASE_URL`.
 3. Copiar la conexión directa o del **Session Pooler** en `DIRECT_URL`.
-4. Crear un clúster en MongoDB Atlas, un usuario de base de datos y permitir la conexión desde el entorno de desarrollo.
+4. Crear un clúster en MongoDB Atlas y un usuario de base de datos. En
+   `Security > Network Access`, usar `Add IP Address > Add Current IP Address`
+   para permitir la conexión desde el equipo de desarrollo. Si la IP pública
+   cambia, esta autorización debe actualizarse; no se recomienda abrir
+   `0.0.0.0/0` durante el desarrollo.
 5. Copiar la cadena de Atlas en `MONGODB_URI` y usar `MONGODB_DATABASE=green_days`.
 6. Duplicar `.env.example` como `.env.local` y reemplazar solo allí los valores de ejemplo.
 7. Ejecutar `pnpm db:migrate` para crear las tablas.

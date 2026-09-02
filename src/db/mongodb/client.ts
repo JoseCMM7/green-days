@@ -9,8 +9,10 @@ const globalForMongo = globalThis as typeof globalThis & {
 
 function createMongoClient(uri: string) {
   return new MongoClient(uri, {
-    connectTimeoutMS: 10_000,
-    serverSelectionTimeoutMS: 12_000,
+    appName: "green-days",
+    connectTimeoutMS: 5_000,
+    serverSelectionTimeoutMS: 5_000,
+    maxPoolSize: 10,
     serverApi: {
       version: ServerApiVersion.v1,
       strict: true,

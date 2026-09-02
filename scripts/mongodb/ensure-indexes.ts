@@ -10,6 +10,10 @@ async function ensureIndexes() {
   }
 
   const client = new MongoClient(uri, {
+    appName: "green-days-indexes",
+    connectTimeoutMS: 5_000,
+    serverSelectionTimeoutMS: 5_000,
+    maxPoolSize: 5,
     serverApi: {
       version: ServerApiVersion.v1,
       strict: true,
