@@ -10,7 +10,7 @@ const recordedDays: Record<number, string> = {
 
 export function MonthCalendar() {
   return (
-    <section className="rounded-[1.6rem] border border-[var(--line)] bg-[var(--paper)] p-5 shadow-[0_16px_45px_rgba(91,59,32,0.1)]" aria-labelledby="calendar-title">
+    <section className="month-calendar-panel p-5" aria-labelledby="calendar-title">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">Tu calendario</p>

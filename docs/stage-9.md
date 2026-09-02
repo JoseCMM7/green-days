@@ -76,6 +76,12 @@ crean entradas antes de tiempo.
   acceso parece una hoja pegada sobre una mesa, con bordes ligeramente irregulares.
 - El logotipo original entregado para Green Days reemplaza la marca genérica
   anterior y se sirve localmente desde `public/green-days-logo.png`.
+- Un segundo ajuste amplía y reencuadra ese logotipo, convierte la cabecera en
+  una franja cálida de papel y devuelve estados activos claros a la navegación
+  sin usar transparencias ni desenfoques.
+- El fondo general usa tonos miel y una fibra apenas visible. Las tarjetas
+  principales emplean bordes irregulares, cinta y sombras cortas para evitar la
+  cuadrícula excesivamente perfecta de una plantilla generada.
 
 ## Verificación
 

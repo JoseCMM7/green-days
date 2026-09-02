@@ -3,7 +3,7 @@ import Link from "next/link";
 export function DailyEntryCard() {
   return (
     <section
-      className="overflow-hidden rounded-[2rem] border border-[var(--line)] bg-[var(--paper)] shadow-[0_24px_65px_rgba(91,59,32,0.12)]"
+      className="daily-entry-panel overflow-hidden"
       aria-labelledby="daily-entry-title"
     >
       <div className="grid md:grid-cols-[minmax(0,1fr)_19rem]">
@@ -27,7 +27,7 @@ export function DailyEntryCard() {
           </p>
           <Link
             href="/journal/today"
-            className="mt-7 inline-flex items-center gap-3 rounded-full bg-[var(--yellow)] px-6 py-3.5 text-sm font-bold text-[var(--brown-dark)] shadow-[0_12px_28px_rgba(181,117,25,0.2)] transition hover:-translate-y-0.5 hover:bg-[#f5cd61]"
+            className="paper-button-primary mt-7 text-sm"
           >
             Abrir mi libro
             <span aria-hidden="true">→</span>

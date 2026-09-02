@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <a href="#main-content" className="skip-link">Saltar al contenido</a>
         <div
-          className={`min-h-screen bg-[var(--cream)] text-[var(--ink)] ${personalization?.reducedMotion ? "motion-reduced" : ""}`}
+          className={`site-surface min-h-screen text-[var(--ink)] ${personalization?.reducedMotion ? "motion-reduced" : ""}`}
           style={personalization?.cssVariables as CSSProperties | undefined}
         >
           <TopNavigation />

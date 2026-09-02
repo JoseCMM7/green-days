@@ -40,10 +40,10 @@ export function TopNavigation() {
 
   if (pathname === "/showcase") {
     return (
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f0dfb9]">
-        <div className="mx-auto flex h-[5.25rem] w-full max-w-[92rem] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
-          <BrandMark />
-          <div className="flex items-center gap-2"><Link href="/auth/login" className="rounded-full border border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold sm:text-sm">Entrar</Link><Link href="/auth/sign-up" className="rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold sm:text-sm">Crear mi diario</Link></div>
+      <header className="site-header">
+        <div className="site-header-inner">
+          <Link href="/showcase" className="brand-home-link" aria-label="Green Days, inicio de la presentación"><BrandMark /></Link>
+          <div className="site-header-actions"><Link href="/auth/login" className="site-header-action">Entrar</Link><Link href="/auth/sign-up" className="site-header-action site-header-action-primary">Crear mi diario</Link></div>
         </div>
       </header>
     );
@@ -51,22 +51,18 @@ export function TopNavigation() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f0dfb9]">
-        <div className="mx-auto flex h-[5.25rem] w-full max-w-[92rem] items-center justify-between gap-6 px-5 sm:px-8 lg:px-12">
-          <BrandMark />
+      <header className="site-header">
+        <div className="site-header-inner">
+          <Link href="/" className="brand-home-link" aria-label="Green Days, inicio"><BrandMark /></Link>
 
           <nav className="hidden lg:block" aria-label="Navegación principal">
-            <ul className="flex items-center gap-1.5">
+            <ul className="site-nav-list">
               {navigation.map((item) => (
                 <li key={item.label}>
                   <Link
                     href={item.href}
                     aria-current={pathname === item.href ? "page" : undefined}
-                    className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-                      pathname === item.href
-                        ? "border-[var(--ochre)] text-[var(--brown-dark)]"
-                        : "border-transparent text-[var(--brown)] hover:border-[var(--brown-light)] hover:text-[var(--brown-dark)]"
-                    }`}
+                    className="site-nav-link"
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
@@ -78,7 +74,7 @@ export function TopNavigation() {
 
           <Link
             href="/account"
-            className="grid size-11 shrink-0 place-items-center rounded-full border border-[var(--brown-light)] bg-[var(--paper)] text-sm font-bold text-[var(--brown-dark)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--yellow-soft)]"
+            className="site-account-link"
             aria-label="Abrir mi cuenta"
           >
             Yo
@@ -86,11 +82,11 @@ export function TopNavigation() {
         </div>
       </header>
 
-      <nav className="fixed right-3 bottom-3 left-3 z-30 border border-[var(--brown-light)] bg-[#f9edd0] p-1.5 shadow-[0.25rem_0.35rem_0_#8f6b42] lg:hidden" aria-label="Navegación móvil">
+      <nav className="mobile-site-nav lg:hidden" aria-label="Navegación móvil">
         <ul className="grid grid-cols-5">
           {navigation.map((item) => (
             <li key={item.label}>
-              <Link href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[0.6rem] font-semibold ${pathname === item.href ? "bg-[var(--yellow)] text-[var(--brown-dark)]" : "text-[var(--brown)]"}`}>
+              <Link href={item.href} aria-current={pathname === item.href ? "page" : undefined} className="mobile-site-nav-link">
                 <NavIcon name={item.icon} />
                 <span className="truncate">{item.label}</span>
               </Link>

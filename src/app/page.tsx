@@ -70,7 +70,7 @@ export default async function Home() {
                 </button>
               </div>
 
-              <article className="memory-card group overflow-hidden rounded-[1.75rem] border border-[var(--line)] bg-[var(--paper)] shadow-[0_20px_55px_rgba(91,76,48,0.08)]">
+              <article className="memory-card group overflow-hidden">
                 <div className="grid sm:grid-cols-[15rem_1fr]">
                   <div className="memory-illustration relative min-h-52 overflow-hidden sm:min-h-full">
                     <div className="absolute top-8 left-8 size-20 rounded-full border-2 border-[#aa7925] bg-[#ffd35a]" />
@@ -102,7 +102,7 @@ export default async function Home() {
           <aside className="space-y-7 lg:pt-4">
             <MonthCalendar />
 
-            <section className="rounded-[1.6rem] bg-[var(--brown-dark)] p-6 text-[var(--paper)] shadow-[0_18px_45px_rgba(82,50,27,0.2)]">
+            <section className="rounded-[0.75rem_1rem_0.65rem_0.9rem] bg-[var(--brown-dark)] p-6 text-[var(--paper)] shadow-[0.35rem_0.42rem_0_#9c7444]">
               <div className="mb-5 flex size-10 items-center justify-center rounded-full bg-white/10 text-[#f5cb62]">
                 <SparkleIcon />
               </div>
