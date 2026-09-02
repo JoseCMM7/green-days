@@ -64,6 +64,11 @@ Cada fecha pasada o presente del calendario es ahora un enlace directo a
 la fecha, como un separador físico. Los días futuros aparecen desactivados y no
 crean entradas antes de tiempo.
 
+`/journal/today` funciona solamente como un alias: calcula la fecha usando la
+zona horaria guardada en el perfil y redirige a esa misma ruta fechada. Por eso
+“Mi libro” desde Inicio y una fecha elegida en el calendario comparten exactamente
+el mismo editor, fondo, navegación y estado de apertura.
+
 ## Refinamiento visual humano
 
 - El separador de fecha permanece invisible detrás de la portada cerrada y sólo

@@ -16,7 +16,8 @@ test.describe("editor con una cuenta exclusiva de pruebas", () => {
 
   test("abre el libro y comprueba edición, historial local y zoom", async ({ page }) => {
     await page.goto("/journal/today");
-    await page.getByRole("button", { name: "Abrir el libro de hoy" }).click();
+    await expect(page).toHaveURL(/\/journal\/\d{4}-\d{2}-\d{2}\?open=1$/);
+    await expect(page.getByRole("button", { name: "Cerrar el libro" })).toBeVisible();
     await page.getByTitle("Añadir estrella").click();
     await expect(page.getByRole("button", { name: "Deshacer último cambio" })).toBeEnabled();
     await page.getByRole("button", { name: "Deshacer último cambio" }).click();
