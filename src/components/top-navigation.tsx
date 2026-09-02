@@ -40,7 +40,7 @@ export function TopNavigation() {
 
   if (pathname === "/showcase") {
     return (
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(244,226,187,0.94)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f0dfb9]">
         <div className="mx-auto flex h-[5.25rem] w-full max-w-[92rem] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
           <BrandMark />
           <div className="flex items-center gap-2"><Link href="/auth/login" className="rounded-full border border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold sm:text-sm">Entrar</Link><Link href="/auth/sign-up" className="rounded-full bg-[var(--yellow)] px-4 py-2 text-xs font-bold sm:text-sm">Crear mi diario</Link></div>
@@ -51,7 +51,7 @@ export function TopNavigation() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[rgba(244,226,187,0.92)] shadow-[0_8px_30px_rgba(91,59,32,0.06)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[#f0dfb9]">
         <div className="mx-auto flex h-[5.25rem] w-full max-w-[92rem] items-center justify-between gap-6 px-5 sm:px-8 lg:px-12">
           <BrandMark />
 
@@ -62,10 +62,10 @@ export function TopNavigation() {
                   <Link
                     href={item.href}
                     aria-current={pathname === item.href ? "page" : undefined}
-                    className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
                       pathname === item.href
-                        ? "bg-[var(--yellow)] text-[var(--brown-dark)] shadow-[0_7px_18px_rgba(179,120,26,0.16)]"
-                        : "text-[var(--brown)] hover:bg-[var(--paper)] hover:text-[var(--brown-dark)]"
+                        ? "border-[var(--ochre)] text-[var(--brown-dark)]"
+                        : "border-transparent text-[var(--brown)] hover:border-[var(--brown-light)] hover:text-[var(--brown-dark)]"
                     }`}
                   >
                     <NavIcon name={item.icon} />
@@ -86,7 +86,7 @@ export function TopNavigation() {
         </div>
       </header>
 
-      <nav className="fixed right-3 bottom-3 left-3 z-30 rounded-[1.35rem] border border-[var(--brown-light)] bg-[rgba(249,237,208,0.95)] p-1.5 shadow-[0_16px_45px_rgba(65,42,25,0.2)] backdrop-blur-xl lg:hidden" aria-label="Navegación móvil">
+      <nav className="fixed right-3 bottom-3 left-3 z-30 border border-[var(--brown-light)] bg-[#f9edd0] p-1.5 shadow-[0.25rem_0.35rem_0_#8f6b42] lg:hidden" aria-label="Navegación móvil">
         <ul className="grid grid-cols-5">
           {navigation.map((item) => (
             <li key={item.label}>

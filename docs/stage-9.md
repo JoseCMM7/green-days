@@ -25,8 +25,10 @@ Next.js carga y sirve de forma local la fuente variable Caveat mediante
 `next/font`. El tamaño persistido en MongoDB ahora sí se transforma en tamaño
 visual dentro de la página lógica.
 
-Al enfocar un texto aparece un tirador para mover su caja y un tirador inferior
-para cambiar sus dimensiones. El estuche ofrece además `A−` y `A+`. Los libros
+Al enfocar un texto aparece un tirador para mover su caja, otro para cambiar
+simultáneamente sus dimensiones y tipografía, y uno más para girarlo libremente.
+Una regla visible sobre el libro ofrece además tamaño `−`/`+` y giro hacia ambos
+lados sin obligar a abrir el estuche. Los libros
 creados con la antigua caja bloqueada se preparan en memoria: se cambia la fuente
 anterior por la nueva y se desbloquea únicamente el marco legado de 840 × 1120;
 el documento original no se muta hasta que el usuario realiza y guarda un cambio.
@@ -56,13 +58,26 @@ el mismo historial de deshacer. No duplica fotografías ni archivos privados.
 ## Calendario como separador
 
 Cada fecha pasada o presente del calendario es ahora un enlace directo a
-`/journal/AAAA-MM-DD?open=1`. El libro llega abierto y muestra una cinta roja con
+`/journal/AAAA-MM-DD?open=1`. El libro llega abierto y muestra una cinta ocre con
 la fecha, como un separador físico. Los días futuros aparecen desactivados y no
 crean entradas antes de tiempo.
 
+## Refinamiento visual humano
+
+- El separador de fecha permanece invisible detrás de la portada cerrada y sólo
+  aparece cuando el diario ya está abierto.
+- Se retiraron los fondos con manchas luminosas, `backdrop-filter`, paneles de
+  vidrio y sombras desenfocadas que no representaban un material real.
+- Los degradados conservados tienen una función concreta: simular papel, cuero,
+  fibra, canto o volumen del libro.
+- La navegación principal usa subrayado y superficies opacas; la pantalla de
+  acceso parece una hoja pegada sobre una mesa, con bordes ligeramente irregulares.
+- El logotipo original entregado para Green Days reemplaza la marca genérica
+  anterior y se sirve localmente desde `public/green-days-logo.png`.
+
 ## Verificación
 
-- 27 pruebas de lógica y modelo aprobadas.
+- 28 pruebas de lógica y modelo aprobadas.
 - TypeScript y ESLint sin errores.
 - Compilación de producción correcta con Next.js 16.3.3.
 - 8 pruebas públicas de Playwright aprobadas; 2 autenticadas omitidas por no

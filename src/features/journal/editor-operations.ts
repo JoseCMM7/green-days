@@ -84,6 +84,20 @@ export function changeTextFontSize(book: JournalBook, pageId: string, elementId:
   return true;
 }
 
+export function rotateBookElement(
+  book: JournalBook,
+  pageId: string,
+  elementId: string,
+  rotation: number,
+) {
+  const element = book.pages
+    .find((page) => page.id === pageId)
+    ?.elements.find((candidate) => candidate.id === elementId);
+  if (!element || element.frame.locked || element.type === "drawing") return false;
+  element.frame.rotation = Math.max(-360, Math.min(360, rotation));
+  return true;
+}
+
 export function resizeBookElement(book: JournalBook, pageId: string, elementId: string, width: number) {
   const element = book.pages.find((page) => page.id === pageId)?.elements.find((candidate) => candidate.id === elementId);
   if (!element || element.frame.locked || element.type === "drawing") return false;

@@ -3,7 +3,7 @@ import test from "node:test";
 import { pageElementSchema } from "../src/db/mongodb/schemas";
 import { createDefaultBook, prepareBookForImmersiveEditing } from "../src/features/journal/default-book";
 import type { JournalBook } from "../src/features/journal/default-book";
-import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, mediaIdsInElements, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "../src/features/journal/editor-operations";
+import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, MAX_UNDO_STEPS, mediaIdsInBook, mediaIdsInElements, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement, rotateBookElement } from "../src/features/journal/editor-operations";
 
 function bookWithPhoto() {
   const book = createDefaultBook();
@@ -78,6 +78,28 @@ test("mueve una capa entre páginas y permite ajustar la escritura", () => {
   assert.equal(resizeBookElement(book, target.id, writing.id, 640), true);
   assert.equal(changeTextFontSize(book, target.id, writing.id, 8), true);
   assert.equal(writing.type === "text" && writing.content.fontSize, 50);
+});
+
+test("permite girar texto y stickers, pero respeta las capas bloqueadas", () => {
+  const book = createDefaultBook();
+  const page = book.pages[0];
+  const writing = page.elements[0];
+  writing.frame.locked = false;
+  assert.equal(rotateBookElement(book, page.id, writing.id, -23), true);
+  assert.equal(writing.frame.rotation, -23);
+
+  const sticker = pageElementSchema.parse({
+    id: crypto.randomUUID(),
+    type: "sticker",
+    frame: { x: 20, y: 20, width: 120, height: 120, rotation: 0, zIndex: 1, locked: false },
+    content: { stickerId: "little-sun" },
+  });
+  page.elements.push(sticker);
+  assert.equal(rotateBookElement(book, page.id, sticker.id, 37), true);
+  assert.equal(sticker.frame.rotation, 37);
+  sticker.frame.locked = true;
+  assert.equal(rotateBookElement(book, page.id, sticker.id, 80), false);
+  assert.equal(sticker.frame.rotation, 37);
 });
 
 test("el historial local conserva como máximo cincuenta estados independientes", () => {

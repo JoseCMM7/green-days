@@ -70,8 +70,8 @@ La etapa 8 pule el producto y lo hace presentable sin desplegarlo:
 La etapa 9 transforma el diario en una experiencia física e inmersiva:
 
 - Portada de cuero envejecido con textura original, grosor de hojas, lomo y sombras 3D.
-- Escritura con tipografía de lápiz, caja movible y tamaño ajustable.
-- Stickers y otras capas redimensionables y transferibles entre las dos páginas.
+- Escritura con tipografía de lápiz, caja movible, tamaño ajustable y rotación libre.
+- Stickers y otras capas redimensionables, giratorias y transferibles entre las dos páginas.
 - Hojeado desde las esquinas, gestos táctiles y controles móviles siempre accesibles.
 - El calendario abre cada fecha como un separador colocado dentro del diario.
 - Herramientas guardadas en un estuche plegable y navegación global oculta al escribir.

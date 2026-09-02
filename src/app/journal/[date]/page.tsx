@@ -28,9 +28,9 @@ export default async function DatedJournalPage({
     <main className="diary-room pb-28 pt-4 lg:pb-14 lg:pt-6">
       <div className="mx-auto w-full max-w-[94rem] px-3 sm:px-6 lg:px-10">
         <header className="mb-2 flex flex-wrap items-center justify-between gap-3 px-2" aria-label="Salida del diario">
-          <Link href="/calendar" className="inline-flex items-center gap-2 rounded-full border border-[var(--brown-light)] bg-[rgba(249,237,209,.88)] px-4 py-2 text-xs font-bold text-[var(--brown)] shadow-sm backdrop-blur"><span aria-hidden="true">←</span> Volver a los separadores</Link>
+          <Link href="/calendar" className="inline-flex items-center gap-2 border-b border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold text-[var(--brown)]"><span aria-hidden="true">←</span> Volver a los separadores</Link>
           <p className="font-display text-lg font-semibold text-[var(--brown)]">Green Days · diario personal</p>
-          <Link href={`/capsules?entry=${entry.entryId}`} className="rounded-full border border-[var(--brown-light)] bg-[rgba(249,237,209,.88)] px-4 py-2 text-xs font-bold text-[var(--brown)] shadow-sm backdrop-blur">Guardar como cápsula</Link>
+          <Link href={`/capsules?entry=${entry.entryId}`} className="border-b border-[var(--brown-light)] bg-[var(--paper)] px-4 py-2 text-xs font-bold text-[var(--brown)]">Guardar como cápsula</Link>
         </header>
         <BookEditor entryId={entry.entryId} entryDate={entry.entryDate} initialRevision={entry.revision} initialBook={entry.book} initialPrimaryMood={entry.primaryMood} autoOpen={query.open === "1"} />
       </div>

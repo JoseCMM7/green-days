@@ -141,7 +141,7 @@ export function EmotionalCalendar({ initialData }: { initialData: CalendarMonthD
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[var(--line)] bg-[rgba(249,237,209,0.82)] p-5 shadow-[0_20px_55px_rgba(91,59,32,0.09)] backdrop-blur sm:p-7" aria-labelledby="month-moments-title">
+      <section className="rounded-[0.6rem] border border-[var(--line)] bg-[var(--paper)] p-5 shadow-[0.25rem_0.3rem_0_rgba(91,59,32,0.14)] sm:p-7" aria-labelledby="month-moments-title">
         <div className="mb-6 flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ochre)]">Lo que viviste</p>

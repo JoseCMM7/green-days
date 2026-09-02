@@ -17,7 +17,7 @@ import {
 } from "@/features/journal/book-pages";
 import { prepareBookForImmersiveEditing, type JournalBook } from "@/features/journal/default-book";
 import { formatEntryDate } from "@/features/journal/date";
-import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement } from "@/features/journal/editor-operations";
+import { changeTextFontSize, clampBookZoom, cropPhoto, directionForSwipe, duplicateBookElement, moveBookElementToPage, nudgeBookElement, pushBookSnapshot, resizeBookElement, rotateBookElement } from "@/features/journal/editor-operations";
 import { preparePhotoForUpload } from "@/features/media/photo-preparation";
 
 type BookEditorProps = {
@@ -623,6 +623,31 @@ export function BookEditor({
     setSelectedElement(null);
   }
 
+  function resizeSelectedElementByStep(delta: number) {
+    if (!selectedElement || !selectedElementData) return;
+    changeBook((draft) => {
+      if (selectedElementData.type === "text") {
+        return changeTextFontSize(draft, selectedElement.pageId, selectedElement.elementId, delta / 5);
+      }
+      return resizeBookElement(
+        draft,
+        selectedElement.pageId,
+        selectedElement.elementId,
+        selectedElementData.frame.width + delta,
+      );
+    });
+  }
+
+  function rotateSelectedElementByStep(delta: number) {
+    if (!selectedElement || !selectedElementData) return;
+    changeBook((draft) => rotateBookElement(
+      draft,
+      selectedElement.pageId,
+      selectedElement.elementId,
+      selectedElementData.frame.rotation + delta,
+    ));
+  }
+
   function handleResizePointerDown(
     event: React.PointerEvent<HTMLButtonElement>,
     pageId: string,
@@ -636,7 +661,10 @@ export function BookEditor({
     if (!pageElement) return;
     const pageRect = pageElement.getBoundingClientRect();
     const startX = event.clientX;
+    const startY = event.clientY;
     const initialWidth = element.frame.width;
+    const initialFontSize = element.type === "text" ? element.content.fontSize : null;
+    const frameRatio = element.frame.height / element.frame.width;
     let recorded = false;
 
     function move(pointerEvent: PointerEvent) {
@@ -647,9 +675,62 @@ export function BookEditor({
         setCanRedo(false);
         recorded = true;
       }
-      const deltaWidth = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
+      const horizontalDelta = ((pointerEvent.clientX - startX) / pageRect.width) * 1000;
+      const verticalDelta = ((pointerEvent.clientY - startY) / pageRect.height) * 1400;
+      const deltaWidth = (horizontalDelta + verticalDelta / frameRatio) / 2;
       changeBook((draft) => {
         resizeBookElement(draft, pageId, element.id, initialWidth + deltaWidth);
+        const resized = draft.pages
+          .find((page) => page.id === pageId)
+          ?.elements.find((candidate) => candidate.id === element.id);
+        if (resized?.type === "text" && initialFontSize !== null) {
+          const scale = resized.frame.width / initialWidth;
+          resized.content.fontSize = clamp(initialFontSize * scale, 8, 160);
+        }
+      }, { recordHistory: false });
+    }
+
+    function finish() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    }
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
+  }
+
+  function handleRotationPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    pageId: string,
+    element: PageElement,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (element.frame.locked || element.type === "drawing") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const pageElement = event.currentTarget.closest<HTMLElement>("[data-book-page]");
+    if (!pageElement) return;
+    const pageRect = pageElement.getBoundingClientRect();
+    const centerX = pageRect.left + ((element.frame.x + element.frame.width / 2) / 1000) * pageRect.width;
+    const centerY = pageRect.top + ((element.frame.y + element.frame.height / 2) / 1400) * pageRect.height;
+    const startAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+    const initialRotation = element.frame.rotation;
+    let recorded = false;
+
+    function move(pointerEvent: PointerEvent) {
+      if (!recorded) {
+        undoStackRef.current = pushBookSnapshot(undoStackRef.current, bookRef.current);
+        redoStackRef.current = [];
+        setCanUndo(true);
+        setCanRedo(false);
+        recorded = true;
+      }
+      const angle = Math.atan2(pointerEvent.clientY - centerY, pointerEvent.clientX - centerX);
+      const deltaDegrees = ((angle - startAngle) * 180) / Math.PI;
+      changeBook((draft) => {
+        rotateBookElement(draft, pageId, element.id, initialRotation + deltaDegrees);
       }, { recordHistory: false });
     }
 
@@ -930,38 +1011,6 @@ export function BookEditor({
             {selectedElementData && selectedElement && selectedElementData.type !== "drawing" && (
               <>
                 <span className="mx-1 h-7 w-px bg-[var(--line)]" />
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
-                      element.frame.rotation = (element.frame.rotation + 15) % 360;
-                    })
-                  }
-                  className="tool-pill"
-                >
-                  Girar
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    changeBook((draft) => resizeBookElement(draft, selectedElement.pageId, selectedElement.elementId, selectedElementData.frame.width + 40))
-                  }
-                  className="tool-pill"
-                  aria-label="Aumentar elemento"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    changeBook((draft) => resizeBookElement(draft, selectedElement.pageId, selectedElement.elementId, selectedElementData.frame.width - 40))
-                  }
-                  className="tool-pill"
-                  aria-label="Reducir elemento"
-                >
-                  −
-                </button>
-                {selectedElementData.type === "text" && <><button type="button" onClick={() => changeBook((draft) => changeTextFontSize(draft, selectedElement.pageId, selectedElement.elementId, -6))} className="tool-pill" aria-label="Reducir tamaño de letra">A−</button><button type="button" onClick={() => changeBook((draft) => changeTextFontSize(draft, selectedElement.pageId, selectedElement.elementId, 6))} className="tool-pill" aria-label="Aumentar tamaño de letra">A+</button></>}
                 {otherVisiblePage && <button type="button" onClick={() => moveSelectedElementToPage(otherVisiblePage.id)} className="tool-pill">Mover a página {otherVisiblePage.pageNumber}</button>}
                 <button type="button" onClick={() => updateElement(selectedElement.pageId, selectedElement.elementId, (element) => {
                   const page = bookRef.current.pages.find((candidate) => candidate.id === selectedElement.pageId);
@@ -985,6 +1034,25 @@ export function BookEditor({
         </div>
       </section>
       </details>
+
+      {isOpen && selectedElement && selectedElementData && selectedElementData.type !== "drawing" && (
+        <aside className="element-inspector" aria-label="Ajustes del elemento seleccionado">
+          <span className="element-inspector-label">
+            {selectedElementData.type === "text" ? "Texto" : selectedElementData.type === "sticker" ? "Sticker" : selectedElementData.type === "photo" ? "Foto" : "Audio"}
+          </span>
+          <span className="element-inspector-group" role="group" aria-label="Cambiar tamaño">
+            <span>Tamaño</span>
+            <button type="button" onClick={() => resizeSelectedElementByStep(-40)} disabled={selectedElementData.frame.locked} aria-label="Reducir tamaño">−</button>
+            <button type="button" onClick={() => resizeSelectedElementByStep(40)} disabled={selectedElementData.frame.locked} aria-label="Aumentar tamaño">+</button>
+          </span>
+          <span className="element-inspector-group" role="group" aria-label="Girar elemento">
+            <span>Girar</span>
+            <button type="button" onClick={() => rotateSelectedElementByStep(-10)} disabled={selectedElementData.frame.locked} aria-label="Girar a la izquierda">↶</button>
+            <button type="button" onClick={() => rotateSelectedElementByStep(10)} disabled={selectedElementData.frame.locked} aria-label="Girar a la derecha">↷</button>
+          </span>
+          <button type="button" className="element-inspector-close" onClick={() => setSelectedElement(null)} aria-label="Cerrar ajustes">×</button>
+        </aside>
+      )}
 
       <div className="book-stage" onTouchStart={beginPageSwipe} onTouchEnd={finishPageSwipe}>
         <div
@@ -1117,7 +1185,7 @@ export function BookEditor({
                     <button
                       type="button"
                       onPointerDown={(event) => handleResizePointerDown(event, page.id, selectedElementData)}
-                      className="absolute z-40 grid size-7 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 border-white bg-[var(--ochre)] text-xs font-black text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brown-dark)]"
+                      className="element-transform-handle element-resize-handle"
                       style={{
                         left: `${(selectedElementData.frame.x + selectedElementData.frame.width) / 10}%`,
                         top: `${(selectedElementData.frame.y + selectedElementData.frame.height) / 14}%`,
@@ -1125,6 +1193,21 @@ export function BookEditor({
                       aria-label="Arrastrar para cambiar el tamaño del elemento seleccionado"
                       title="Arrastra para cambiar tamaño"
                     >↘</button>
+                  )}
+                {selectedElement && selectedElement.pageId === page.id && selectedElementData
+                  && selectedElementData.type !== "drawing"
+                  && !selectedElementData.frame.locked && editorTool === "write" && (
+                    <button
+                      type="button"
+                      onPointerDown={(event) => handleRotationPointerDown(event, page.id, selectedElementData)}
+                      className="element-transform-handle element-rotation-handle"
+                      style={{
+                        left: `${(selectedElementData.frame.x + selectedElementData.frame.width) / 10}%`,
+                        top: `${selectedElementData.frame.y / 14}%`,
+                      }}
+                      aria-label="Arrastrar para girar el elemento seleccionado"
+                      title="Arrastra para girar"
+                    >↻</button>
                   )}
                 {editorTool === "draw" && isOpen && (
                   <div

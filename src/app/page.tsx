@@ -73,7 +73,7 @@ export default async function Home() {
               <article className="memory-card group overflow-hidden rounded-[1.75rem] border border-[var(--line)] bg-[var(--paper)] shadow-[0_20px_55px_rgba(91,76,48,0.08)]">
                 <div className="grid sm:grid-cols-[15rem_1fr]">
                   <div className="memory-illustration relative min-h-52 overflow-hidden sm:min-h-full">
-                    <div className="absolute top-8 left-8 size-20 rounded-full bg-[#ffd35a] shadow-[0_0_70px_24px_rgba(255,211,90,0.5)]" />
+                    <div className="absolute top-8 left-8 size-20 rounded-full border-2 border-[#aa7925] bg-[#ffd35a]" />
                     <div className="absolute right-[-8%] bottom-[-28%] h-56 w-64 rotate-[-8deg] rounded-[50%] bg-[#9b6a43]" />
                     <div className="absolute bottom-[-34%] left-[-18%] h-56 w-64 rotate-[15deg] rounded-[50%] bg-[#d2a85d]" />
                     <div className="absolute right-8 bottom-7 text-5xl" aria-hidden="true">

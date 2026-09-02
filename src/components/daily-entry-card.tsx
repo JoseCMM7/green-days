@@ -35,7 +35,7 @@ export function DailyEntryCard() {
         </div>
 
         <div className="relative min-h-56 overflow-hidden bg-[#d8bc78] p-8 md:min-h-full">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_22%,rgba(255,225,128,0.65),transparent_36%)]" />
+          <div className="absolute inset-0 bg-[repeating-linear-gradient(92deg,rgba(97,61,30,0.08)_0_1px,transparent_1px_8px)]" />
           <div className="absolute top-[18%] right-[18%] h-[68%] w-[56%] rotate-6 rounded-r-2xl rounded-l-md bg-[#986333] shadow-[0_22px_35px_rgba(74,42,19,0.28)]">
             <div className="absolute inset-3 rounded-r-xl border border-[#efd18b]/70" />
             <div className="absolute top-0 bottom-0 left-0 w-[12%] bg-[#68401f]" />
